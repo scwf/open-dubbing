@@ -1,0 +1,17 @@
+.vscode/
+.idea/
+.pytest_cache/
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+.cursor/
+model-dir/
+refer_voice/
+output/
+input/
+**/*.env
+**/*.conf

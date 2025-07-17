@@ -1,0 +1,27 @@
+# SRT配音工具配置文件
+# 复制此文件并根据实际需求修改参数
+
+[基本配置]
+# 输入文件路径（SRT或TXT，必须指定）
+input_file = /path/to/input.srt
+
+# 参考语音文件路径（WAV格式，必须指定）
+voice_file = /path/to/reference.wav
+
+# 参考音频文本
+prompt_text = 
+
+# 输出音频文件路径（默认：output.wav）
+output_file = /path/to/output.wav
+
+# TTS引擎选择：fish_speech, index_tts, f5_tts, cosy_voice
+tts_engine = fish_speech
+
+# 时间同步策略：stretch, basic
+# 注意：TXT文件模式下系统会自动使用basic策略
+strategy = basic
+
+[高级配置]
+# 语言设置：zh, en, ja, ko（TXT模式专用）
+language = zh
+
