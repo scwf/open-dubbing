@@ -1,6 +1,6 @@
-# SRT Dubbing 配置指导文档
+# AI Dubbing Tool 配置指导文档
 
-本指南详细介绍如何为不同TTS引擎配置srt_dubbing项目环境。
+本指南详细介绍如何为不同TTS引擎配置AI配音工具项目环境。
 
 ## 支持的TTS引擎
 
@@ -25,116 +25,89 @@
 
 ### 1. 环境配置文件
 
-现在使用 `.env` 文件统一管理所有路径配置，无需手动修改代码。
+项目使用 `.env` 文件管理TTS引擎路径配置，避免硬编码。
 
 #### 1.1 复制配置文件
 ```bash
-cd /path/to/srt_dubbing
+cd ai_dubbing
 cp .env.example .env
 ```
 
 #### 1.2 编辑配置文件
-编辑 `.env` 文件，根据实际路径修改：
+编辑 `ai_dubbing/.env` 文件，设置各引擎的绝对路径：
 
 ```bash
-# 项目根目录
-PROJECT_ROOT=/home/xiaofei/code/index-tts
+# 模型缓存目录（建议设置绝对路径），模型会自动下载到此目录
+MODEL_CACHE_DIR=/home/xiaofei/code/open-dubbing/model-dir
 
-# 模型缓存目录
-MODEL_CACHE_DIR=model-dir
-
-# TTS引擎源码目录
-FISH_SPEECH_DIR=${PROJECT_ROOT}/fish-speech
-INDEX_TTS_DIR=${PROJECT_ROOT}/index-tts
-COSYVOICE_DIR=${PROJECT_ROOT}/CosyVoice
-
-# 模型目录（自动下载或手动放置）
-FISH_SPEECH_MODEL=${MODEL_CACHE_DIR}/openaudio-s1-mini
-INDEX_TTS_MODEL=${MODEL_CACHE_DIR}/index_tts
-F5_TTS_MODEL=${MODEL_CACHE_DIR}/F5TTS_v1_Base
-COSYVOICE_MODEL=${MODEL_CACHE_DIR}/cosyvoice-2-0.5b
-
-# 输出目录
-OUTPUT_DIR=output
+# TTS引擎源码目录（建议设置绝对路径）
+FISH_SPEECH_DIR=/home/xiaofei/code/fish-speech
+INDEX_TTS_DIR=/home/xiaofei/code/index-tts
+COSYVOICE_DIR=/home/xiaofei/code/CosyVoice
 ```
 
-### 2. 环境配置
+### 2. TTS引擎配置（按需配置）
 
-#### 2.1 安装依赖
-```bash
-# 安装python-dotenv
-pip install python-dotenv
-```
+#### Fish Speech 配置（推荐）
 
-#### 2.2 通用创建环境流程
-每个引擎的环境创建步骤相同：
+**完整安装步骤：**
 
 ```bash
-# 以fish-speech为例
+# 1. 创建独立环境
 conda create -n fish-speech python=3.10
 conda activate fish-speech
 
-# 安装系统依赖
+# 2. 安装系统依赖
 apt-get install ffmpeg
 # 或使用conda
 conda install -c conda-forge ffmpeg
 
-# 安装音频处理依赖
-pip install librosa numpy soundfile
-
-# 安装日志依赖
-pip install colorama tqdm
-
-# 安装分句依赖包
-pip install pysbd
-
-# 安装python-dotenv
-pip install python-dotenv
-
-# 安装PyTorch（请根据你的CUDA版本选择合适的指令）
+# 3. 安装Python依赖
+pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
-```
 
-### 3. TTS引擎配置（按需配置）
-
-#### Fish Speech 配置（推荐）
-
-##### 克隆源码
-```bash
+# 4. 克隆并安装引擎
 git clone https://github.com/fishaudio/fish-speech.git
-```
-
-##### 安装引擎
-```bash
 cd fish-speech
 pip install -e .
-```
 
-##### 模型下载
-```bash
-# 首次运行时会自动下载模型到 model-dir/openaudio-s1-mini/
-# 如需手动下载：
+# 5. 更新.env配置
+# 编辑 ai_dubbing/.env 文件，设置：
+# FISH_SPEECH_DIR=/absolute/path/to/fish-speech
+
+# 6. 模型下载（首次运行自动下载，或手动下载）
 huggingface-cli download fishaudio/openaudio-s1-mini \
   --local-dir model-dir/openaudio-s1-mini
 ```
 
 #### IndexTTS 配置
 
-##### 克隆源码
-```bash
-git clone https://github.com/index-tts/index-tts.git
-```
+**完整安装步骤：**
 
-##### 安装引擎
 ```bash
+# 1. 创建独立环境
+conda create -n index-tts python=3.10
+conda activate index-tts
+
+# 2. 安装系统依赖
+apt-get install ffmpeg
+# 或使用conda
+conda install -c conda-forge ffmpeg
+
+# 3. 安装Python依赖
+pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# 4. 克隆并安装引擎
+git clone https://github.com/index-tts/index-tts.git
 cd index-tts
 pip install -e .
-```
 
-##### 模型下载
-```bash
-# 首次运行时会自动下载模型到 model-dir/index_tts/
-# 如需手动下载：
+# 5. 更新.env配置
+# 编辑 ai_dubbing/.env 文件，设置：
+# INDEX_TTS_DIR=/absolute/path/to/index-tts
+
+# 6. 模型下载（首次运行自动下载，或手动下载）
 huggingface-cli download IndexTeam/IndexTTS-1.5 \
   config.yaml bigvgan_discriminator.pth bigvgan_generator.pth \
   bpe.model dvae.pth gpt.pth unigram_12000.vocab \
@@ -143,35 +116,56 @@ huggingface-cli download IndexTeam/IndexTTS-1.5 \
 
 #### F5-TTS 配置
 
-##### 安装引擎
-```bash
-pip install f5-tts
-```
+**完整安装步骤：**
 
-##### 模型下载
 ```bash
-# 首次运行时会自动下载模型到 model-dir/F5TTS_v1_Base/
+# 1. 创建独立环境
+conda create -n f5-tts python=3.10
+conda activate f5-tts
+
+# 2. 安装系统依赖
+apt-get install ffmpeg
+# 或使用conda
+conda install -c conda-forge ffmpeg
+
+# 3. 安装Python依赖
+pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# 4. 安装引擎
+pip install f5-tts
+
+# 5. 模型自动下载（首次运行时自动下载到 model-dir/F5TTS_v1_Base/）
 ```
 
 #### CosyVoice 配置
 
-##### 克隆源码
-```bash
-git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git
-```
+**完整安装步骤：**
 
-##### 安装引擎
 ```bash
+# 1. 创建独立环境
+conda create -n cosyvoice python=3.10
+conda activate cosyvoice
+
+# 2. 安装系统依赖
+apt-get install ffmpeg sox libsox-dev
+# 或使用conda
+conda install -c conda-forge ffmpeg
+
+# 3. 安装Python依赖
+pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# 4. 克隆并安装引擎
+git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git
 cd CosyVoice
 pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-sudo apt-get install sox libsox-dev
-```
 
-##### 模型下载
-```bash
-# 首次运行时会自动下载模型到 model-dir/cosyvoice-2-0.5b/
-# 如需手动下载：
+# 5. 更新.env配置
+# 编辑 ai_dubbing/.env 文件，设置：
+# COSYVOICE_DIR=/absolute/path/to/CosyVoice
 
+# 6. 模型下载（首次运行自动下载，或手动下载）
 # 使用SDK下载（推荐）
 python -c "
 from modelscope import snapshot_download
@@ -182,19 +176,9 @@ snapshot_download('iic/CosyVoice-300M-Instruct', local_dir='model-dir/cosyvoice-
 snapshot_download('iic/CosyVoice-ttsfrd', local_dir='model-dir/cosyvoice-ttsfrd')
 "
 
-# 使用git下载（需安装git-lfs）
+# 或使用git下载（需安装git-lfs）
 git lfs install
 git clone https://www.modelscope.cn/iic/CosyVoice2-0.5B.git model-dir/cosyvoice-2-0.5b
-git clone https://www.modelscope.cn/iic/CosyVoice-300M.git model-dir/cosyvoice-300m
-git clone https://www.modelscope.cn/iic/CosyVoice-300M-SFT.git model-dir/cosyvoice-300m-sft
-git clone https://www.modelscope.cn/iic/CosyVoice-300M-Instruct.git model-dir/cosyvoice-300m-instruct
-git clone https://www.modelscope.cn/iic/CosyVoice-ttsfrd.git model-dir/cosyvoice-ttsfrd
-
-# 可选：安装ttsfrd包以获得更好的文本标准化性能
-# cd model-dir/cosyvoice-ttsfrd/
-# unzip resource.zip -d .
-# pip install ttsfrd_dependency-0.1-py3-none-any.whl
-# pip install ttsfrd-0.4.2-cp310-cp310-linux_x86_64.whl
 ```
 
 ## 环境使用原则
