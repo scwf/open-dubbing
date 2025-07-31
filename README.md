@@ -7,7 +7,7 @@ AI配音工具是一个专业的AI语音克隆配音解决方案，通过先进�
 ### 主要特性
 
 - **🎯 精确同步**: 支持时间拉伸策略，确保配音与字幕时长完全匹配
-- **🎨 高质量音频**: 基于IndexTTS模型，生成自然流畅的语音
+- **🎨 高质量音频**: 基于Fish-speech\IndexTTS\CosyVoice\F5等模型，生成自然流畅的语音
 - **⚙️ 灵活策略**: 提供基础策略和拉伸策略，适应不同需求
 - **📊 实时监控**: 专业日志系统，实时显示处理进度和状态
 - **🔧 易于使用**: 简洁的命令行接口，支持批量处理
@@ -44,109 +44,62 @@ ai_dubbing/
 
 ## 🛠️ 环境配置
 
-### 系统要求
-
-- Python 3.10+
-- Linux/Windows/macOS
-- 至少8GB内存（推荐16GB）
-- 支持CUDA的GPU（可选，用于加速）
-
-### 依赖安装
-0. **ai-dubbing**
-   todo: clone repo
-   #### 创建python env环境
-   conda create -n ai-dubbing python=3.10
-   conda activate ai-dubbing
-
-   #### 安装PyTorch（请根据你的CUDA版本选择合适的指令）
-   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-   ##### 安装系统依赖
-   apt-get install ffmpeg
-   #####  或使用conda
-   conda install -c conda-forge ffmpeg
-
-   #### 安装音频处理依赖
-   pip install librosa numpy soundfile
-
-   #### 安装日志依赖
-   pip install colorama tqdm
-
-   #### 安装分句依赖包
-   pip install pysbd
-
-
-1. **配置IndexTTS引擎 (如需使用)**
-
-   #### 克隆IndexTTS主仓库到ai-dubbing并列的目录
-
-   ```bash
-   git clone https://github.com/index-tts/index-tts.git
-   cd index-tts
-   pip install -r requirements.txt
-   ```
-
-   #### 下载模型文件（以1.5版本为例）到指定目录（model-dir）：
-   ```bash
-   huggingface-cli download IndexTeam/IndexTTS-1.5 \
-     config.yaml bigvgan_discriminator.pth bigvgan_generator.pth bpe.model dvae.pth gpt.pth unigram_12000.vocab \
-     --local-dir model-dir
-   ```
-
-   如下载速度慢，可使用镜像：
-
-   ```bash
-   export HF_ENDPOINT="https://hf-mirror.com"
-   ```
-
-   或用wget单独下载：
-
-   ```bash
-   wget https://huggingface.co/IndexTeam/IndexTTS-1.5/resolve/main/bigvgan_discriminator.pth -P model-dir
-   wget https://huggingface.co/IndexTeam/IndexTTS-1.5/resolve/main/bigvgan_generator.pth -P model-dir
-   wget https://huggingface.co/IndexTeam/IndexTTS-1.5/resolve/main/bpe.model -P model-dir
-   wget https://huggingface.co/IndexTeam/IndexTTS-1.5/resolve/main/dvae.pth -P model-dir
-   wget https://huggingface.co/IndexTeam/IndexTTS-1.5/resolve/main/gpt.pth -P model-dir
-   wget https://huggingface.co/IndexTeam/IndexTTS-1.5/resolve/main/unigram_12000.vocab -P model-dir
-   wget https://huggingface.co/IndexTeam/IndexTTS-1.5/resolve/main/config.yaml -P model-dir
-   ```
-
-   > 注意：如需使用IndexTTS-1.0模型，请将上述命令中的`IndexTeam/IndexTTS-1.5`替换为`IndexTeam/IndexTTS`。
-
-
-2. **配置 CosyVoice引擎 (如需使用)**
-   
-   #### 克隆CosyVoice主仓库到ai-dubbing并列的目录
-   ```bash
-   git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git
-   cd CosyVoice
-   pip install -r requirements.txt
-   # 注意：需要将CosyVoice项目路径添加到PYTHONPATH
-   ```
-3. **配置 F5TTS (如需使用)**
-
-   ```bash
-   pip install f5-tts
-   ```
-
-4. **配置 Fish Speech引擎 (如需使用)**
-
-   #### 克隆Fish Speech主仓库到ai-dubbing并列的目录
-   ```bash
-   git clone https://github.com/fishaudio/fish-speech.git
-   cd fish-speech
-   pip install -e .
-   
-   # 下载模型文件
-   python tools/download_models.py
-   # 或手动下载模型到checkpoints/openaudio-s1-mini目录
-   ```
+环境安装和配置请参考 [INSTALL.md](INSTALL.md) 文件。
 
 ## 📝 使用说明
 
-### 基础使用
+支持两种使用方式：**配置文件方式**（推荐）和**命令行参数方式**。
 
-默认使用 `index_tts` 引擎和 `stretch` 策略。
+### 方式一：配置文件方式（推荐）
+
+#### 1. 创建配置文件
+复制配置文件模板并修改：
+
+```bash
+cp ai_dubbing/dubbing.conf.example ai_dubbing/dubbing.conf
+```
+
+#### 2. 编辑配置文件
+修改 `ai_dubbing/dubbing.conf` 中的参数：
+
+```ini
+# SRT配音工具配置文件
+# 复制此文件并根据实际需求修改参数
+
+[基本配置]
+# 输入文件路径（SRT或TXT，必须指定）
+input_file = subtitles/movie.srt
+
+# 参考语音文件路径（WAV格式，必须指定）
+voice_file = voices/narrator.wav
+
+# 参考音频文本（使用fish_speech/cosy_voice/f5_tts时需要）
+prompt_text = "这是参考音频讲的语音对应的文字"
+
+# 输出音频文件路径（默认：output.wav）
+output_file = output/movie_dubbed.wav
+
+# TTS引擎选择：fish_speech, index_tts, f5_tts, cosy_voice
+tts_engine = fish_speech
+
+# 时间同步策略：stretch, basic
+# 注意：TXT文件模式下系统会自动使用basic策略
+strategy = basic
+
+[高级配置]
+# 语言设置：zh, en, ja, ko（TXT模式专用）
+language = zh
+```
+
+#### 3. 运行配音
+```bash
+python ai_dubbing/run_dubbing.py
+```
+
+### 方式二：CLI命令行参数
+
+#### 基础使用
+默认使用 `index_tts` 引擎和 `stretch` 策略：
 
 ```bash
 python -m ai_dubbing.src.cli \
@@ -155,7 +108,7 @@ python -m ai_dubbing.src.cli \
   --output result.wav
 ```
 
-### 完整示例
+#### 完整示例
 
 ```bash
 # 使用时间拉伸策略，精确匹配字幕时长 (使用默认的index_tts引擎)
@@ -164,9 +117,7 @@ python -m ai_dubbing.src.cli \
   --voice voices/narrator.wav \
   --output output/movie_dubbed.wav \
   --strategy stretch \
-  --model-dir model-dir/index_tts \
-  --verbose
-
+  --model-dir model-dir/index_tts
 
 # 使用CosyVoice引擎 (需要提供参考文本)
 python -m ai_dubbing.src.cli \
@@ -175,8 +126,7 @@ python -m ai_dubbing.src.cli \
   --output output/movie_cosy.wav \
   --tts-engine cosy_voice \
   --prompt-text "这是参考音频说的话。" \
-  --fp16 \
-  --verbose
+  --fp16
 
 # 使用Fish Speech引擎 (需要提供参考文本)
 python -m ai_dubbing.src.cli \
@@ -184,8 +134,7 @@ python -m ai_dubbing.src.cli \
   --voice voices/speaker.wav \
   --output output/movie_fish.wav \
   --tts-engine fish_speech \
-  --prompt-text "这是参考音频说的话。" \
-  --verbose
+  --prompt-text "这是参考音频说的话。"
 
 # 使用基础策略，自然语音合成
 python -m ai_dubbing.src.cli \
@@ -193,8 +142,6 @@ python -m ai_dubbing.src.cli \
   --voice voices/narrator.wav \
   --output output/movie_natural.wav \
   --strategy basic
-
-
 ```
 
 ## 🔧 命令行参数
@@ -225,9 +172,6 @@ python -m ai_dubbing.src.cli \
 
 ### 其他
 
-| 参数 | 默认值 | 说明 | 示例 |
-|------|--------|------|------|
-| `--verbose` | 关闭 | 显示详细调试信息 | `--verbose` |
 
 ### 策略说明
 
