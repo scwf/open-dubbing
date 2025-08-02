@@ -25,3 +25,17 @@ strategy = basic
 # 语言设置：zh, en, ja, ko（TXT模式专用）
 language = zh
 
+[字幕优化配置]
+# 自动优化SRT字幕时长（默认：启用）
+auto_optimize = true
+
+# 字幕时长范围（秒）
+min_duration = 1.5
+max_duration = 6.0
+
+# 合并阈值（秒），字幕间隔小于此值时考虑合并
+merge_threshold = 0.8
+
+# 优化文件后缀
+optimized_suffix = _optimized
+

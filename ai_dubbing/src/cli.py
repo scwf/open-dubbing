@@ -8,7 +8,7 @@ import argparse
 import time
 
 # 使用绝对导入
-from ai_dubbing.src.utils import setup_project_path
+from ai_dubbing.src.utils.common_utils import setup_project_path
 from ai_dubbing.src.config import PATH
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
@@ -66,6 +66,16 @@ def main():
     parser.add_argument("--ref-text", help="[F5TTS] 参考音频对应的文本")
 
 
+    # --- 字幕优化选项 ---
+    parser.add_argument("--no-optimize", action="store_true", 
+                       help="禁用SRT字幕自动优化")
+    parser.add_argument("--optimized-output", 
+                       help="优化字幕输出路径（默认：原文件名+_optimized.srt）")
+    parser.add_argument("--min-duration", type=float, default=1.5,
+                       help="字幕最小时长（秒），默认：1.5")
+    parser.add_argument("--max-duration", type=float, default=6.0,
+                       help="字幕最大时长（秒），默认：6.0")
+    
     # --- 其他选项 ---
     
     args = parser.parse_args()
@@ -98,7 +108,18 @@ def main():
             logger.info(f"检测到TXT文件输入，将按语言 '{args.lang}' 的规则进行解析。")
             parser_instance = TXTParser(language=args.lang)
         else:
-            parser_instance = SRTParser()
+            # 根据优化设置创建SRT解析器
+            auto_optimize = not args.no_optimize
+            parser_instance = SRTParser(
+                auto_optimize=auto_optimize,
+                min_duration=args.min_duration,
+                max_duration=args.max_duration
+            )
+            
+            if auto_optimize and not args.no_optimize:
+                logger.info("SRT字幕自动优化已启用")
+            elif args.no_optimize:
+                logger.info("SRT字幕优化已禁用")
         
         entries = parser_instance.parse_file(input_file)
         logger.success(f"成功解析 {len(entries)} 个条目")

@@ -15,3 +15,4 @@ output/
 input/
 **/*.env
 **/*.conf
+CLAUDE.md

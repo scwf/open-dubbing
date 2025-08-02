@@ -21,7 +21,7 @@ if project_root_str not in sys.path:
     sys.path.append(project_root_str)
 
 # 使用绝对导入
-from ai_dubbing.src.utils import setup_project_path
+from ai_dubbing.src.utils.common_utils import setup_project_path
 from ai_dubbing.src.config import PATH
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
@@ -72,6 +72,11 @@ def main():
     lang = get_config_value(config, '高级配置', 'language', 'zh')
     prompt_text = get_config_value(config, '基本配置', 'prompt_text', None)
     
+    # 字幕优化配置
+    auto_optimize = get_config_value(config, '字幕优化配置', 'auto_optimize', True, bool)
+    min_duration = get_config_value(config, '字幕优化配置', 'min_duration', 1.5, float)
+    max_duration = get_config_value(config, '字幕优化配置', 'max_duration', 6.0, float)
+    
     # --- 初始化 ---
     start_time = time.time()
     setup_logging("INFO")
@@ -108,7 +113,17 @@ def main():
             process_logger.logger.info(f"检测到TXT文件输入，将按语言 '{lang}' 的规则进行解析。")
             parser_instance = TXTParser(language=lang)
         else:
-            parser_instance = SRTParser()
+            # 根据配置创建SRT解析器
+            parser_instance = SRTParser(
+                auto_optimize=auto_optimize,
+                min_duration=min_duration,
+                max_duration=max_duration
+            )
+            
+            if auto_optimize:
+                process_logger.logger.info("SRT字幕自动优化已启用")
+            else:
+                process_logger.logger.info("SRT字幕优化已禁用")
         
         entries = parser_instance.parse_file(input_file)
         process_logger.logger.success(f"成功解析 {len(entries)} 个条目")
