@@ -21,7 +21,7 @@ if project_root_str not in sys.path:
     sys.path.append(project_root_str)
 
 # 使用绝对导入
-from ai_dubbing.src.utils import setup_project_path
+from ai_dubbing.src.utils.common_utils import setup_project_path
 from ai_dubbing.src.config import PATH
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
@@ -72,6 +72,12 @@ def main():
     lang = get_config_value(config, '高级配置', 'language', 'zh')
     prompt_text = get_config_value(config, '基本配置', 'prompt_text', None)
     
+    # LLM优化配置
+    auto_optimize = get_config_value(config, '字幕优化配置', 'auto_optimize', True, bool)
+    api_key = get_config_value(config, '字幕优化配置', 'llm_api_key', None)
+    model = get_config_value(config, '字幕优化配置', 'llm_model', 'deepseek-chat')
+    base_url = get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com')
+    
     # --- 初始化 ---
     start_time = time.time()
     setup_logging("INFO")
@@ -108,7 +114,19 @@ def main():
             process_logger.logger.info(f"检测到TXT文件输入，将按语言 '{lang}' 的规则进行解析。")
             parser_instance = TXTParser(language=lang)
         else:
-            parser_instance = SRTParser()
+            # 根据配置创建SRT解析器
+            parser_instance = SRTParser(
+                auto_optimize=auto_optimize,
+                api_key=api_key,
+                model=model,
+                base_url=base_url
+            )
+            
+            if auto_optimize:
+                if api_key:
+                    process_logger.logger.info("SRT字幕LLM优化已启用")
+                else:
+                    process_logger.logger.info("SRT字幕LLM优化已启用但API密钥未配置，将跳过优化")
         
         entries = parser_instance.parse_file(input_file)
         process_logger.logger.success(f"成功解析 {len(entries)} 个条目")

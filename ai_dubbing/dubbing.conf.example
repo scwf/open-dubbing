@@ -25,3 +25,22 @@ strategy = basic
 # 语言设置：zh, en, ja, ko（TXT模式专用）
 language = zh
 
+[字幕优化配置]
+# 自动优化SRT字幕时长（默认：启用）
+auto_optimize = true
+
+# LLM优化器配置
+# LLM API密钥（可选，不配置则跳过LLM优化）
+llm_api_key = 
+
+# LLM模型选择
+llm_model = deepseek-chat
+base_url = https://api.deepseek.com
+
+# 时间阈值配置（秒/字符或秒/单词）
+chinese_char_min_time = 0.15  # 每个中文字最小时间
+english_word_min_time = 0.4   # 每个英文单词最小时间
+
+# LLM优化文件后缀
+llm_optimized_suffix = _llm_optimized
+

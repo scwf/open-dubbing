@@ -8,20 +8,7 @@ import re
 from typing import List, NamedTuple, Optional
 from pathlib import Path
 from ai_dubbing.src.logger import get_logger
-
-
-class SRTEntry(NamedTuple):
-    """SRT条目数据结构"""
-    index: int
-    start_time: float  # 秒
-    end_time: float    # 秒
-    text: str
-    
-    @property
-    def duration(self) -> float:
-        """获取持续时间（秒）"""
-        return self.end_time - self.start_time
-
+from ai_dubbing.src.utils.subtitle_optimizer import LLMContextOptimizer, SRTEntry
 
 class SRTParser:
     """SRT文件解析器"""
@@ -31,8 +18,13 @@ class SRTParser:
         r'(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})'
     )
     
-    def __init__(self):
+    def __init__(self, auto_optimize: bool = True, 
+                 api_key: Optional[str] = None,
+                 model: str = "deepseek-chat",
+                 base_url: str = "https://api.deepseek.com"):
         self.entries: List[SRTEntry] = []
+        self.auto_optimize = auto_optimize
+        self.optimizer = LLMContextOptimizer(api_key=api_key, model=model, base_url=base_url)
     
     @staticmethod
     def time_to_seconds(hours: int, minutes: int, seconds: int, milliseconds: int) -> float:
@@ -67,39 +59,6 @@ class SRTParser:
         milliseconds = int((total_seconds % 1) * 1000)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
     
-    def parse_file(self, file_path: str) -> List[SRTEntry]:
-        """
-        解析SRT文件
-        
-        Args:
-            file_path: SRT文件路径
-            
-        Returns:
-            SRT条目列表
-            
-        Raises:
-            FileNotFoundError: 文件不存在
-            ValueError: 文件格式错误
-        """
-        logger = get_logger()
-        logger.step(f"读取SRT文件: {file_path}")
-        
-        srt_file = Path(file_path)
-        if not srt_file.exists():
-            raise FileNotFoundError(f"SRT文件不存在: {file_path}")
-        
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                logger.debug(f"文件读取成功，大小: {len(content)} 字符")
-        except UnicodeDecodeError:
-            logger.debug("UTF-8解码失败，尝试GBK编码")
-            # 尝试其他编码
-            with open(file_path, 'r', encoding='gbk') as f:
-                content = f.read()
-                logger.debug(f"GBK解码成功，大小: {len(content)} 字符")
-        
-        return self.parse_content(content)
     
     def parse_content(self, content: str) -> List[SRTEntry]:
         """
@@ -171,8 +130,63 @@ class SRTParser:
                 raise ValueError(f"解析SRT条目失败: {block[:50]}... 错误: {e}")
         
         self.entries = entries
-        logger.success(f"SRT解析完成，共 {len(entries)} 个有效条目")
-        return entries
+        logger.success(f"SRT解析完成，共 {len(self.entries)} 个有效条目")
+        return self.entries
+    
+    def parse_file(self, file_path: str) -> List[SRTEntry]:
+        """
+        解析SRT文件
+        
+        Args:
+            file_path: SRT文件路径
+            
+        Returns:
+            SRT条目列表
+            
+        Raises:
+            FileNotFoundError: 文件不存在
+            ValueError: 文件格式错误
+        """
+        logger = get_logger()
+        logger.step(f"读取SRT文件: {file_path}")
+        
+        srt_file = Path(file_path)
+        if not srt_file.exists():
+            raise FileNotFoundError(f"SRT文件不存在: {file_path}")
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                logger.debug(f"文件读取成功，大小: {len(content)} 字符")
+        except UnicodeDecodeError:
+            logger.debug("UTF-8解码失败，尝试GBK编码")
+            # 尝试其他编码
+            with open(file_path, 'r', encoding='gbk') as f:
+                content = f.read()
+                logger.debug(f"GBK解码成功，大小: {len(content)} 字符")
+        
+        entries = self.parse_content(content)
+        
+        # 自动优化字幕
+        if self.auto_optimize and entries:
+            logger.info("开始自动优化字幕...")
+            optimized_entries, report = self.optimizer.optimize_subtitles(entries)
+            
+            if report.merged_count > 0:
+                # 保存优化后的字幕
+                optimized_path = self.optimizer.save_optimized_srt(
+                    optimized_entries, str(file_path)
+                )
+                logger.info(f"优化字幕已保存: {optimized_path}")
+                
+                # 更新使用优化后的字幕
+                self.entries = optimized_entries
+                logger.success(self.optimizer.generate_optimization_summary(report))
+            else:
+                logger.info("字幕无需优化")
+        
+        logger.success(f"SRT解析完成，共 {len(self.entries)} 个有效条目")
+        return self.entries
     
     def validate_entries(self, entries: List[SRTEntry]) -> bool:
         """
