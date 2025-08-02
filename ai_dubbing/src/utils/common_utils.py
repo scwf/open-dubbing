@@ -1,7 +1,7 @@
 """
 通用工具模块
 
-提供项目中常用的工具函数，避免代码重复。
+提供项目中常用的工具函数和类
 """
 
 import os
@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Union
 import logging
 import numpy as np
-from ai_dubbing.src.config import CosyVoiceConfig, IndexTTSConfig, FishSpeechConfig
+
+from ai_dubbing.src.config import CosyVoiceConfig, IndexTTSConfig, FishSpeechConfig, AUDIO
+
 
 def setup_project_path():
     """
@@ -20,7 +22,7 @@ def setup_project_path():
     """
     # 获取项目根目录 (index-tts)
     current_file = Path(__file__).resolve()
-    project_root = current_file.parent.parent.parent  # ai_dubbing/src/utils.py -> index-tts
+    project_root = current_file.parent.parent.parent  # ai_dubbing/src/utils/common_utils.py -> index-tts
     
     # 添加到 sys.path（如果还没有的话）
     project_root_str = str(project_root)
@@ -41,7 +43,6 @@ def setup_project_path():
         sys.path.append(FishSpeechConfig.SOURCE_DIR)
 
     return project_root
-
 
 
 def validate_file_exists(file_path: str, file_type: str = "文件") -> bool:
@@ -157,9 +158,6 @@ def normalize_audio_data(audio_data_int16, normalization_factor: Optional[float]
     Returns:
         numpy.ndarray: 规范化后的float32音频数据
     """
-    import numpy as np
-    from .config import AUDIO
-
     if normalization_factor is None:
         normalization_factor = AUDIO.AUDIO_NORMALIZATION_FACTOR  # 默认32768.0
 
@@ -176,5 +174,4 @@ def initialize_project():
         Path: project_root_path
     """
     project_root = setup_project_path()
-    
     return project_root
