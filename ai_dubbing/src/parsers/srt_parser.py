@@ -8,7 +8,7 @@ import re
 from typing import List, NamedTuple, Optional
 from pathlib import Path
 from ai_dubbing.src.logger import get_logger
-from ai_dubbing.src.utils.subtitle_optimizer import SRTEntry
+from ai_dubbing.src.optimizer.subtitle_optimizer import SRTEntry
 
 class SRTParser:
     """SRT文件解析器"""

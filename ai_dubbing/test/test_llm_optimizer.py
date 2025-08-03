@@ -15,7 +15,7 @@ current_file = Path(__file__).resolve()
 sys.path.insert(0, str(current_file.parent.parent.parent))
 
 from ai_dubbing.src.parsers.srt_parser import SRTEntry
-from ai_dubbing.src.utils.subtitle_optimizer import LLMContextOptimizer
+from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer, TimeBorrowOptimizer
 
 
 class TestLLMContextOptimizer(unittest.TestCase):
@@ -64,51 +64,21 @@ class TestLLMContextOptimizer(unittest.TestCase):
         self.assertEqual(lang_type, 'mixed_cn9_en2')
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
     
-    def test_identify_high_density_contexts(self):
-        """测试高密度字幕识别（基于最小时间阈值）"""
-        entries = [
-            SRTEntry(1, 0.0, 2.0, "正常字幕"),  # 4中文字符 * 0.13 = 0.6秒，实际2秒，充足
-            SRTEntry(2, 2.5, 3.0, "高密度字幕"),  # 5中文字符 * 0.13 = 0.75秒，实际0.5秒，不足
-            SRTEntry(3, 3.5, 5.0, "正常字幕"),  # 4中文字符 * 0.13 = 0.6秒，实际1.5秒，充足
-        ]
+    def test_calculate_minimum_duration(self):
+        """测试最小时间计算"""
+        # 中文字符测试
+        text = "正常字幕"
+        min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
+        expected = len(text) * 0.13
+        self.assertAlmostEqual(min_duration, expected, places=2)
+        self.assertEqual(lang_type, 'chinese')
         
-        contexts = self.optimizer.identify_high_density_contexts(entries)
-        
-        # 应该识别到第2条字幕
-        self.assertEqual(len(contexts), 1)
-        self.assertEqual(contexts[0]['index'], 1)  # 索引1是第2条
-        self.assertEqual(contexts[0]['min_required_duration'], 0.65)  # 5字符 * 0.13秒/字符
-    
-    def test_no_high_density_subtitles(self):
-        """测试无高密度字幕的情况"""
-        entries = [
-            SRTEntry(1, 0.0, 3.0, "正常字幕"),
-            SRTEntry(2, 3.5, 6.0, "正常字幕"),
-        ]
-        
-        contexts = self.optimizer.identify_high_density_contexts(entries)
-        
-        # 不应该识别到任何高密度字幕
-        self.assertEqual(len(contexts), 0)
-    
-    def test_context_boundary_conditions(self):
-        """测试边界条件：第一条和最后一条字幕"""
-        entries = [
-            SRTEntry(1, 0.0, 0.5, "高密度首条"),  # 5字符 * 0.13 = 0.75秒，实际0.5秒，不足
-            SRTEntry(2, 1.0, 2.0, "正常字幕"),   # 4字符 * 0.13 = 0.6秒，实际1秒，充足
-            SRTEntry(3, 2.5, 3.0, "高密度末条"),  # 5字符 * 0.13 = 0.75秒，实际0.5秒，不足
-        ]
-        
-        contexts = self.optimizer.identify_high_density_contexts(entries)
-        
-        self.assertEqual(len(contexts), 2)
-        
-        # 验证边界条件索引
-        self.assertEqual(contexts[0]['index'], 0)
-        self.assertEqual(contexts[0]['current'].text, "高密度首条")
-        
-        self.assertEqual(contexts[1]['index'], 2)
-        self.assertEqual(contexts[1]['current'].text, "高密度末条")
+        # 英文单词测试
+        text = "This is test"
+        min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
+        expected = 3 * 0.25  # 3个英文单词
+        self.assertAlmostEqual(min_duration, expected, places=2)
+        self.assertEqual(lang_type, 'english')
     
     def test_empty_entries(self):
         """测试空条目处理"""
@@ -193,19 +163,6 @@ class TestLLMIntegration(unittest.TestCase):
         self.assertEqual(lang_type, 'chinese')
         self.assertGreater(min_duration, 0)
         
-        # 测试时长不足识别
-        contexts = optimizer.identify_high_density_contexts(entries)
-        
-        # 打印分析结果用于调试
-        print(f"\n【sample2.srt时长分析】")
-        print(f"总字幕数: {len(entries)}")
-        for i, entry in enumerate(entries[:5]):  # 只显示前5条
-            min_duration, _ = optimizer.calculate_minimum_duration(entry.text)
-            is_adequate, _, _ = optimizer.is_duration_adequate(entry.text, entry.duration)
-            print(f"字幕{i+1}: '{entry.text}' -> 最小所需: {min_duration:.2f}秒, 实际: {entry.duration:.2f}秒, 充足: {is_adequate}")
-        
-        print(f"识别到的时长不足字幕: {len(contexts)}")
-        
     def test_save_optimized_srt_with_sample(self):
         """测试使用sample2.srt数据保存优化文件"""
         from ai_dubbing.src.parsers.srt_parser import SRTParser
@@ -234,6 +191,86 @@ class TestLLMIntegration(unittest.TestCase):
                 content = f.read()
                 self.assertIn("过去几周，我已经", content)
                 self.assertIn("从Cursor的Agent切换到了Cloud Code", content)
+
+class TestTimeBorrowOptimizer(unittest.TestCase):
+    """时间借用优化器单元测试"""
+    
+    def setUp(self):
+        """测试初始化"""
+        self.borrower = TimeBorrowOptimizer()
+    
+    def test_calculate_needed_extension(self):
+        """测试需要延长时间的计算"""
+        # 时间充足的字幕
+        text = "正常字幕文本"
+        current_duration = 2.0
+        needed = self.borrower.calculate_needed_extension(text, current_duration)
+        self.assertEqual(needed, 0)
+        
+        # 时间不足的字幕
+        text = "这是一个很长的字幕文本需要更多时间"
+        current_duration = 1.0
+        needed = self.borrower.calculate_needed_extension(text, current_duration)
+        self.assertGreater(needed, 0)
+    
+    def test_can_borrow_time(self):
+        """测试时间借用判断"""
+        # 空隙充足
+        prev_gap = 1.0
+        next_gap = 1.0
+        can_borrow, front, back = self.borrower.can_borrow_time(prev_gap, next_gap)
+        self.assertTrue(can_borrow)
+        self.assertGreater(front + back, 0)
+        
+        # 空隙不足
+        prev_gap = 0.1
+        next_gap = 0.1
+        can_borrow, front, back = self.borrower.can_borrow_time(prev_gap, next_gap)
+        self.assertFalse(can_borrow)
+        self.assertEqual(front + back, 0)
+    
+    def test_time_borrow_optimization(self):
+        """测试时间借用优化"""
+        entries = [
+            SRTEntry(1, 0.0, 1.0, "短字幕"),  # 需要延长时间
+            SRTEntry(2, 2.0, 4.0, "正常字幕"),  # 提供前方空隙
+            SRTEntry(3, 5.0, 7.0, "正常字幕"),  # 提供后方空隙
+        ]
+        
+        optimized, decisions = self.borrower.optimize_with_time_borrowing(entries)
+        
+        # 验证结果
+        self.assertEqual(len(optimized), 3)
+        self.assertEqual(len(decisions), 3)
+        
+        # 第一条应该被优化（时间借用或LLM标记）
+        first_decision = decisions[0]
+        self.assertIn(first_decision['action'], ['TIME_BORROW', 'NEED_LLM', 'NO_CHANGE'])
+    
+    def test_boundary_conditions(self):
+        """测试边界条件处理"""
+        # 单条字幕
+        entries = [SRTEntry(1, 0.0, 1.0, "单条字幕")]
+        optimized, decisions = self.borrower.optimize_with_time_borrowing(entries)
+        self.assertEqual(len(optimized), 1)
+        self.assertEqual(len(decisions), 1)
+        
+        # 第一条字幕（无前字幕）
+        entries = [
+            SRTEntry(1, 0.0, 0.5, "首条字幕"),
+            SRTEntry(2, 2.0, 3.0, "第二条"),
+        ]
+        optimized, decisions = self.borrower.optimize_with_time_borrowing(entries)
+        self.assertEqual(len(optimized), 2)
+        
+        # 最后一条字幕（无后字幕）
+        entries = [
+            SRTEntry(1, 0.0, 1.0, "第一条"),
+            SRTEntry(2, 2.0, 2.5, "末条字幕"),
+        ]
+        optimized, decisions = self.borrower.optimize_with_time_borrowing(entries)
+        self.assertEqual(len(optimized), 2)
+
 
 if __name__ == '__main__':
     unittest.main()

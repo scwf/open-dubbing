@@ -21,7 +21,7 @@ if project_root_str not in sys.path:
     sys.path.append(project_root_str)
 
 from ai_dubbing.src.parsers.srt_parser import SRTParser
-from ai_dubbing.src.utils.subtitle_optimizer import LLMContextOptimizer
+from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer
 from ai_dubbing.src.logger import get_logger
 
 def load_config(config_file=str(current_file.parent / "dubbing.conf")):
@@ -62,7 +62,10 @@ def load_config_from_file(config_file=None):
         'model': get_config_value(config, '字幕优化配置', 'llm_model', 'deepseek-chat'),
         'base_url': get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com'),
         'chinese_char_min_time': get_config_value(config, '字幕优化配置', 'chinese_char_min_time', 0.13, float),
-        'english_word_min_time': get_config_value(config, '字幕优化配置', 'english_word_min_time', 0.25, float)
+        'english_word_min_time': get_config_value(config, '字幕优化配置', 'english_word_min_time', 0.25, float),
+        'min_gap_threshold': get_config_value(config, '时间借用配置', 'min_gap_threshold', 0.3, float),
+        'borrow_ratio': get_config_value(config, '时间借用配置', 'borrow_ratio', 0.5, float),
+        'extra_buffer': get_config_value(config, '时间借用配置', 'extra_buffer', 0.2, float)
     }
     
     return llm_config
@@ -110,7 +113,10 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
             model=config['model'],
             base_url=config['base_url'],
             chinese_char_min_time=config['chinese_char_min_time'],
-            english_word_min_time=config['english_word_min_time']
+            english_word_min_time=config['english_word_min_time'],
+            min_gap_threshold=config['min_gap_threshold'],
+            borrow_ratio=config['borrow_ratio'],
+            extra_buffer=config['extra_buffer']
         )
         
         # 执行优化
