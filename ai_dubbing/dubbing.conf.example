@@ -26,9 +26,6 @@ strategy = basic
 language = zh
 
 [字幕优化配置]
-# 自动优化SRT字幕时长（默认：启用）
-auto_optimize = true
-
 # LLM优化器配置
 # LLM API密钥（可选，不配置则跳过LLM优化）
 llm_api_key = 
@@ -44,7 +41,6 @@ english_word_min_time = 0.4   # 每个英文单词最小时间
 # LLM优化文件后缀
 llm_optimized_suffix = _llm_optimized
 
-[字幕优化输出配置]
 # 优化后的SRT文件输出路径（可选，默认在输入文件同目录）
 output_file = /path/to/optimized_subtitles.srt
 

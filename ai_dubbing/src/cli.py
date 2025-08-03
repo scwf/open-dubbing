@@ -64,23 +64,6 @@ def main():
     parser.add_argument("--prompt-text", help="[CosyVoice] 参考音频对应的文本")
 
     parser.add_argument("--ref-text", help="[F5TTS] 参考音频对应的文本")
-
-
-    # --- 字幕优化选项 ---
-    parser.add_argument("--no-optimize", action="store_true", 
-                       help="禁用SRT字幕自动优化")
-    parser.add_argument("--optimized-output", 
-                       help="优化字幕输出路径（默认：原文件名+_llm_optimized.srt）")
-    parser.add_argument("--llm-api-key", 
-                       help="LLM API密钥，用于字幕优化（支持OpenAI兼容接口）")
-    parser.add_argument("--llm-model", default="deepseek-chat",
-                       help="LLM模型选择（默认：deepseek-chat）")
-    parser.add_argument("--base-url", default="https://api.deepseek.com",
-                       help="API基础URL（默认：https://api.deepseek.com）")
-    parser.add_argument("--chinese-char-min-time", type=float, default=0.15,
-                       help="每个中文字最小时间（秒），默认：0.15")
-    parser.add_argument("--english-word-min-time", type=float, default=0.4,
-                       help="每个英文单词最小时间（秒），默认：0.4")
     
     # --- 其他选项 ---
     
@@ -114,22 +97,7 @@ def main():
             logger.info(f"检测到TXT文件输入，将按语言 '{args.lang}' 的规则进行解析。")
             parser_instance = TXTParser(language=args.lang)
         else:
-            # 根据优化设置创建SRT解析器
-            auto_optimize = not args.no_optimize
-            parser_instance = SRTParser(
-                auto_optimize=auto_optimize,
-                api_key=args.llm_api_key,
-                model=args.llm_model,
-                base_url=args.base_url
-            )
-            
-            if auto_optimize and not args.no_optimize:
-                if args.llm_api_key:
-                    logger.info("SRT字幕LLM优化已启用")
-                else:
-                    logger.info("SRT字幕LLM优化已启用但API密钥未提供，将跳过优化")
-            elif args.no_optimize:
-                logger.info("SRT字幕优化已禁用")
+            parser_instance = SRTParser()
         
         entries = parser_instance.parse_file(input_file)
         logger.success(f"成功解析 {len(entries)} 个条目")

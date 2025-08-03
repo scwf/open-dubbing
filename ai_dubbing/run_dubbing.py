@@ -72,11 +72,6 @@ def main():
     lang = get_config_value(config, '高级配置', 'language', 'zh')
     prompt_text = get_config_value(config, '基本配置', 'prompt_text', None)
     
-    # LLM优化配置（保留配置项，供字幕优化工具使用）
-    _ = get_config_value(config, '字幕优化配置', 'llm_api_key', None)
-    _ = get_config_value(config, '字幕优化配置', 'llm_model', 'deepseek-chat')
-    _ = get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com')
-    
     # --- 初始化 ---
     start_time = time.time()
     setup_logging("INFO")
@@ -113,7 +108,6 @@ def main():
             process_logger.logger.info(f"检测到TXT文件输入，将按语言 '{lang}' 的规则进行解析。")
             parser_instance = TXTParser(language=lang)
         else:
-            # 创建SRT解析器（字幕优化由单独的优化工具处理）
             parser_instance = SRTParser()
         
         entries = parser_instance.parse_file(input_file)
