@@ -21,7 +21,7 @@ if project_root_str not in sys.path:
     sys.path.append(project_root_str)
 
 # 使用绝对导入
-from ai_dubbing.src.utils import setup_project_path
+from ai_dubbing.src.utils.common_utils import setup_project_path
 from ai_dubbing.src.config import PATH
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
@@ -113,7 +113,7 @@ def main():
         entries = parser_instance.parse_file(input_file)
         process_logger.logger.success(f"成功解析 {len(entries)} 个条目")
     except Exception as e:
-        process_logger.logger.error(f"解析文件失败: {e}")
+        process_logger.logger.error(f"解析文件失败: {e}", e)
         return 1
 
     # --- 3. 初始化处理策略 ---

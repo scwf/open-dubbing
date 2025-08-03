@@ -8,20 +8,7 @@ import re
 from typing import List, NamedTuple, Optional
 from pathlib import Path
 from ai_dubbing.src.logger import get_logger
-
-
-class SRTEntry(NamedTuple):
-    """SRT条目数据结构"""
-    index: int
-    start_time: float  # 秒
-    end_time: float    # 秒
-    text: str
-    
-    @property
-    def duration(self) -> float:
-        """获取持续时间（秒）"""
-        return self.end_time - self.start_time
-
+from ai_dubbing.src.utils.subtitle_optimizer import SRTEntry
 
 class SRTParser:
     """SRT文件解析器"""
@@ -67,39 +54,6 @@ class SRTParser:
         milliseconds = int((total_seconds % 1) * 1000)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
     
-    def parse_file(self, file_path: str) -> List[SRTEntry]:
-        """
-        解析SRT文件
-        
-        Args:
-            file_path: SRT文件路径
-            
-        Returns:
-            SRT条目列表
-            
-        Raises:
-            FileNotFoundError: 文件不存在
-            ValueError: 文件格式错误
-        """
-        logger = get_logger()
-        logger.step(f"读取SRT文件: {file_path}")
-        
-        srt_file = Path(file_path)
-        if not srt_file.exists():
-            raise FileNotFoundError(f"SRT文件不存在: {file_path}")
-        
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                logger.debug(f"文件读取成功，大小: {len(content)} 字符")
-        except UnicodeDecodeError:
-            logger.debug("UTF-8解码失败，尝试GBK编码")
-            # 尝试其他编码
-            with open(file_path, 'r', encoding='gbk') as f:
-                content = f.read()
-                logger.debug(f"GBK解码成功，大小: {len(content)} 字符")
-        
-        return self.parse_content(content)
     
     def parse_content(self, content: str) -> List[SRTEntry]:
         """
@@ -171,7 +125,44 @@ class SRTParser:
                 raise ValueError(f"解析SRT条目失败: {block[:50]}... 错误: {e}")
         
         self.entries = entries
-        logger.success(f"SRT解析完成，共 {len(entries)} 个有效条目")
+        logger.success(f"SRT解析完成，共 {len(self.entries)} 个有效条目")
+        return self.entries
+    
+    def parse_file(self, file_path: str) -> List[SRTEntry]:
+        """
+        解析SRT文件
+        
+        Args:
+            file_path: SRT文件路径
+            
+        Returns:
+            SRT条目列表
+            
+        Raises:
+            FileNotFoundError: 文件不存在
+            ValueError: 文件格式错误
+        """
+        logger = get_logger()
+        logger.step(f"读取SRT文件: {file_path}")
+        
+        srt_file = Path(file_path)
+        if not srt_file.exists():
+            raise FileNotFoundError(f"SRT文件不存在: {file_path}")
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                logger.debug(f"文件读取成功，大小: {len(content)} 字符")
+        except UnicodeDecodeError:
+            logger.debug("UTF-8解码失败，尝试GBK编码")
+            # 尝试其他编码
+            with open(file_path, 'r', encoding='gbk') as f:
+                content = f.read()
+                logger.debug(f"GBK解码成功，大小: {len(content)} 字符")
+        
+        entries = self.parse_content(content)
+        
+        logger.success(f"SRT解析完成，共 {len(self.entries)} 个有效条目")
         return entries
     
     def validate_entries(self, entries: List[SRTEntry]) -> bool:
