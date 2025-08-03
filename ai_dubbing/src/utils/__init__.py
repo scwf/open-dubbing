@@ -5,4 +5,4 @@
 """
 
 from .common_utils import *
-from .subtitle_optimizer import LLMContextOptimizer
+from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer
