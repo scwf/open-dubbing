@@ -72,11 +72,10 @@ def main():
     lang = get_config_value(config, '高级配置', 'language', 'zh')
     prompt_text = get_config_value(config, '基本配置', 'prompt_text', None)
     
-    # LLM优化配置
-    auto_optimize = get_config_value(config, '字幕优化配置', 'auto_optimize', True, bool)
-    api_key = get_config_value(config, '字幕优化配置', 'llm_api_key', None)
-    model = get_config_value(config, '字幕优化配置', 'llm_model', 'deepseek-chat')
-    base_url = get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com')
+    # LLM优化配置（保留配置项，供字幕优化工具使用）
+    _ = get_config_value(config, '字幕优化配置', 'llm_api_key', None)
+    _ = get_config_value(config, '字幕优化配置', 'llm_model', 'deepseek-chat')
+    _ = get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com')
     
     # --- 初始化 ---
     start_time = time.time()
@@ -114,24 +113,13 @@ def main():
             process_logger.logger.info(f"检测到TXT文件输入，将按语言 '{lang}' 的规则进行解析。")
             parser_instance = TXTParser(language=lang)
         else:
-            # 根据配置创建SRT解析器
-            parser_instance = SRTParser(
-                auto_optimize=auto_optimize,
-                api_key=api_key,
-                model=model,
-                base_url=base_url
-            )
-            
-            if auto_optimize:
-                if api_key:
-                    process_logger.logger.info("SRT字幕LLM优化已启用")
-                else:
-                    process_logger.logger.info("SRT字幕LLM优化已启用但API密钥未配置，将跳过优化")
+            # 创建SRT解析器（字幕优化由单独的优化工具处理）
+            parser_instance = SRTParser()
         
         entries = parser_instance.parse_file(input_file)
         process_logger.logger.success(f"成功解析 {len(entries)} 个条目")
     except Exception as e:
-        process_logger.logger.error(f"解析文件失败: {e}")
+        process_logger.logger.error(f"解析文件失败: {e}", e)
         return 1
 
     # --- 3. 初始化处理策略 ---

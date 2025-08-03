@@ -36,9 +36,9 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "这是一个测试中文字符密度的字幕"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        # 中文字符数量 * 0.15秒
+        # 中文字符数量 * 0.13秒
         chinese_chars = len(text)  # 每个字符都算
-        expected_duration = chinese_chars * 0.15
+        expected_duration = chinese_chars * 0.13
         
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
         self.assertEqual(lang_type, 'chinese')
@@ -48,9 +48,9 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "This is a test subtitle for density calculation"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        # 英文单词数量 * 0.3秒
+        # 英文单词数量 * 0.25秒
         english_words = 8  # 8个英文单词
-        expected_duration = english_words * 0.3
+        expected_duration = english_words * 0.25
         
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
         self.assertEqual(lang_type, 'english')
@@ -60,16 +60,16 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "这是一个test混合的字幕subtitle"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        expected_duration = 9 * 0.15 + 2 * 0.3
+        expected_duration = 9 * 0.13 + 2 * 0.25
         self.assertEqual(lang_type, 'mixed_cn9_en2')
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
     
     def test_identify_high_density_contexts(self):
         """测试高密度字幕识别（基于最小时间阈值）"""
         entries = [
-            SRTEntry(1, 0.0, 2.0, "正常字幕"),  # 4中文字符 * 0.15 = 0.6秒，实际2秒，充足
-            SRTEntry(2, 2.5, 3.0, "高密度字幕"),  # 5中文字符 * 0.15 = 0.75秒，实际0.5秒，不足
-            SRTEntry(3, 3.5, 5.0, "正常字幕"),  # 4中文字符 * 0.15 = 0.6秒，实际1.5秒，充足
+            SRTEntry(1, 0.0, 2.0, "正常字幕"),  # 4中文字符 * 0.13 = 0.6秒，实际2秒，充足
+            SRTEntry(2, 2.5, 3.0, "高密度字幕"),  # 5中文字符 * 0.13 = 0.75秒，实际0.5秒，不足
+            SRTEntry(3, 3.5, 5.0, "正常字幕"),  # 4中文字符 * 0.13 = 0.6秒，实际1.5秒，充足
         ]
         
         contexts = self.optimizer.identify_high_density_contexts(entries)
@@ -77,7 +77,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         # 应该识别到第2条字幕
         self.assertEqual(len(contexts), 1)
         self.assertEqual(contexts[0]['index'], 1)  # 索引1是第2条
-        self.assertEqual(contexts[0]['min_required_duration'], 0.75)  # 5字符 * 0.15秒/字符
+        self.assertEqual(contexts[0]['min_required_duration'], 0.65)  # 5字符 * 0.13秒/字符
     
     def test_no_high_density_subtitles(self):
         """测试无高密度字幕的情况"""
@@ -94,24 +94,21 @@ class TestLLMContextOptimizer(unittest.TestCase):
     def test_context_boundary_conditions(self):
         """测试边界条件：第一条和最后一条字幕"""
         entries = [
-            SRTEntry(1, 0.0, 0.5, "高密度首条"),  # 5字符 * 0.15 = 0.75秒，实际0.5秒，不足
-            SRTEntry(2, 1.0, 2.0, "正常字幕"),   # 4字符 * 0.15 = 0.6秒，实际1秒，充足
-            SRTEntry(3, 2.5, 3.0, "高密度末条"),  # 5字符 * 0.15 = 0.75秒，实际0.5秒，不足
+            SRTEntry(1, 0.0, 0.5, "高密度首条"),  # 5字符 * 0.13 = 0.75秒，实际0.5秒，不足
+            SRTEntry(2, 1.0, 2.0, "正常字幕"),   # 4字符 * 0.13 = 0.6秒，实际1秒，充足
+            SRTEntry(3, 2.5, 3.0, "高密度末条"),  # 5字符 * 0.13 = 0.75秒，实际0.5秒，不足
         ]
         
         contexts = self.optimizer.identify_high_density_contexts(entries)
         
         self.assertEqual(len(contexts), 2)
         
-        # 第一条字幕上下文
+        # 验证边界条件索引
         self.assertEqual(contexts[0]['index'], 0)
-        self.assertIsNone(contexts[0]['prev'])
-        self.assertIsNotNone(contexts[0]['next'])
+        self.assertEqual(contexts[0]['current'].text, "高密度首条")
         
-        # 最后一条字幕上下文
         self.assertEqual(contexts[1]['index'], 2)
-        self.assertIsNotNone(contexts[1]['prev'])
-        self.assertIsNone(contexts[1]['next'])
+        self.assertEqual(contexts[1]['current'].text, "高密度末条")
     
     def test_empty_entries(self):
         """测试空条目处理"""
@@ -121,7 +118,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         self.assertEqual(len(optimized), 0)
         self.assertEqual(report.original_entries, 0)
         self.assertEqual(report.optimized_entries, 0)
-        self.assertEqual(report.merged_count, 0)
+        self.assertEqual(report.simplified_count, 0)
     
     def test_single_entry(self):
         """测试单条字幕"""
@@ -131,7 +128,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         self.assertEqual(len(optimized), 1)
         self.assertEqual(report.original_entries, 1)
         self.assertEqual(report.optimized_entries, 1)
-        self.assertEqual(report.merged_count, 0)
+        self.assertEqual(report.simplified_count, 0)
     
     def test_no_llm_config(self):
         """测试无API密钥的情况"""
@@ -147,7 +144,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         self.assertEqual(len(optimized), 2)
         self.assertEqual(report.original_entries, 2)
         self.assertEqual(report.optimized_entries, 2)
-        self.assertEqual(report.merged_count, 0)
+        self.assertEqual(report.simplified_count, 0)
 
 
 class TestLLMIntegration(unittest.TestCase):
@@ -156,6 +153,7 @@ class TestLLMIntegration(unittest.TestCase):
     def setUp(self):
         """测试初始化"""
         self.test_data_dir = Path(__file__).parent / "test_data"
+        self.target_srt = Path(__file__).parent.parent.parent / "input" / "target_language.srt"
         self.sample_srt = self.test_data_dir / "sample2.srt"
         
     def test_load_sample_srt(self):
@@ -166,7 +164,7 @@ class TestLLMIntegration(unittest.TestCase):
         self.assertTrue(self.sample_srt.exists(), "sample2.srt文件不存在")
         
         # 解析SRT文件
-        parser = SRTParser(auto_optimize=False)
+        parser = SRTParser()
         entries = parser.parse_file(str(self.sample_srt))
         
         # 验证解析结果
@@ -185,7 +183,7 @@ class TestLLMIntegration(unittest.TestCase):
         """测试对样本字幕进行时长分析"""
         from ai_dubbing.src.parsers.srt_parser import SRTParser
         
-        parser = SRTParser(auto_optimize=False)
+        parser = SRTParser()
         entries = parser.parse_file(str(self.sample_srt))
         
         optimizer = LLMContextOptimizer()
@@ -213,12 +211,12 @@ class TestLLMIntegration(unittest.TestCase):
         from ai_dubbing.src.parsers.srt_parser import SRTParser
         
         # 加载样本字幕
-        parser = SRTParser(auto_optimize=False)
+        parser = SRTParser()
         entries = parser.parse_file(str(self.sample_srt))
         
         # 使用LLM优化器
         optimizer = LLMContextOptimizer()
-        optimized_entries, report = optimizer.optimize_subtitles(entries)
+        optimized_entries, _ = optimizer.optimize_subtitles(entries)
         
         with tempfile.TemporaryDirectory():
             # 使用sample2.srt作为原始文件
@@ -236,7 +234,6 @@ class TestLLMIntegration(unittest.TestCase):
                 content = f.read()
                 self.assertIn("过去几周，我已经", content)
                 self.assertIn("从Cursor的Agent切换到了Cloud Code", content)
-
 
 if __name__ == '__main__':
     unittest.main()

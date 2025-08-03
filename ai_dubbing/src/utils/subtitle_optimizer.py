@@ -29,7 +29,7 @@ class OptimizationReport(NamedTuple):
     """优化报告数据结构"""
     original_entries: int
     optimized_entries: int
-    merged_count: int
+    simplified_count: int
     decisions: List[Dict[str, Any]]
 
 
@@ -40,8 +40,8 @@ class LLMContextOptimizer:
                  api_key: Optional[str] = None,
                  model: str = "deepseek-chat",
                  base_url: str = "https://api.deepseek.com",
-                 chinese_char_min_time: float = 0.15,    # 每个中文字最小时间(秒)
-                 english_word_min_time: float = 0.3):     # 每个英文单词最小时间(秒)
+                 chinese_char_min_time: float = 0.13,    # 每个中文字最小时间(秒)
+                 english_word_min_time: float = 0.25):     # 每个英文单词最小时间(秒)
         """
         初始化LLM优化器
         
@@ -123,108 +123,75 @@ class LLMContextOptimizer:
             if not is_adequate:  # 时长不足，需要优化
                 contexts.append({
                     'index': i,
-                    'prev': entries[i-1] if i > 0 else None,
                     'current': entry,
-                    'next': entries[i+1] if i < len(entries) - 1 else None,
                     'min_required_duration': min_duration,
                     'shortage_ratio': min_duration / entry.duration if entry.duration > 0 else float('inf'),
                     'lang_type': lang_type,
-                    'text': entry.text
+                    'text': entry.text,
+                    'all_entries': entries  # 用于获取上下文
                 })
         
         return contexts
     
-    def _build_context_prompt(self, context: Dict[str, Any]) -> str:
-        """构建LLM决策提示词"""
-        prev = context['prev']
+    def _build_simplification_prompt(self, context: Dict[str, Any]) -> str:
+        """构建LLM文本简化提示词"""
         current = context['current']
-        next_entry = context['next']
+        min_required = context['min_required_duration']
         
-        def format_entry(entry: SRTEntry, prefix: str):
-            if not entry:
-                return f"### {prefix}\n文本：无\n时长：0秒\n最小所需时长：0秒\n"
-            
-            is_adequate, min_duration, _ = self.is_duration_adequate(entry.text, entry.duration)
-            
-            return f"""### {prefix}
-                文本："{entry.text}"
-                实际时长：{entry.duration:.2f}秒
-                最小所需时长：{min_duration:.2f}秒
-                时长是否充足：{'是' if is_adequate else '否'}
-                """
+        # 获取上下文（前3条和后3条）
+        entries = context['all_entries']
+        current_idx = context['index']
         
-        # 计算合并场景
-        merge_scenarios = []
+        # 计算上下文范围
+        start_idx = max(0, current_idx - 3)
+        end_idx = min(len(entries), current_idx + 4)
         
-        # 与前一条合并
-        if prev:
-            combined_text = prev.text + " " + current.text
-            combined_duration = current.end_time - prev.start_time
-            merge_scenarios.append({
-                'type': 'MERGE_PREV',
-                'text': combined_text,
-                'duration': combined_duration,
-                'min_duration': self.calculate_minimum_duration(combined_text)[0]
+        context_entries = []
+        for i in range(start_idx, end_idx):
+            entry = entries[i]
+            position = "当前" if i == current_idx else f"前{current_idx-i}" if i < current_idx else f"后{i-current_idx}"
+            context_entries.append({
+                'position': position,
+                'text': entry.text,
+                'index': i + 1
             })
         
-        # 与后一条合并
-        if next_entry:
-            combined_text = current.text + " " + next_entry.text
-            combined_duration = next_entry.end_time - current.start_time
-            merge_scenarios.append({
-                'type': 'MERGE_NEXT',
-                'text': combined_text,
-                'duration': combined_duration,
-                'min_duration': self.calculate_minimum_duration(combined_text)[0]
-            })
-        
-        # 三条合并
-        if prev and next_entry:
-            combined_text = prev.text + " " + current.text + " " + next_entry.text
-            combined_duration = next_entry.end_time - prev.start_time
-            merge_scenarios.append({
-                'type': 'MERGE_BOTH',
-                'text': combined_text,
-                'duration': combined_duration,
-                'min_duration': self.calculate_minimum_duration(combined_text)[0]
-            })
-        
-        scenarios_text = ""
-        for scenario in merge_scenarios:
-            scenarios_text += f"""
-                {scenario['type']}:
-                合并后文本："{scenario['text']}"
-                合并后时长：{scenario['duration']:.2f}秒
-                合并后最小所需时长：{scenario['min_duration']:.2f}秒
-                """
+        context_text = ""
+        for entry in context_entries:
+            marker = "【需要简化】" if entry['index'] == current_idx + 1 else ""
+            context_text += f"字幕{entry['index']} ({entry['position']}){marker}: {entry['text']}\n"
         
         return f"""
-            你是字幕优化专家，请基于时长合理性分析决定最佳合并策略。
-            ## 当前分析场景
-            高密度字幕位于中间，需要与前后字幕优化。
+        你是字幕文本简化专家，请对指定的字幕进行智能简化。
 
-            {format_entry(prev, '字幕A（前一条）')}
-            {format_entry(current, '字幕B（当前字幕，时长不足）')}
-            {format_entry(next_entry, '字幕C（后一条）')}
+        ## 任务说明
+        当前需要简化的字幕文本时长不足，需要简化文本使其朗读时长能够达到最小时长要求。
 
-            ## 合并选项{scenarios_text}
+        ## 上下文信息
+        {context_text}
 
-            ## 决策标准
-            1. 语义连贯性：合并后是否有明显的语义断层和生硬感
-            2. 时长合理性：合并后时长应大于或等于最小所需要求，且不能过长（不超过5秒）
+        ## 需要简化的字幕
+        - 原始文本："{current.text}"
+        - 当前时长：{current.duration:.2f}秒
+        - 需要达到的最小时长：{min_required:.2f}秒
 
-            ## 回复格式
-            DECISION: [MERGE_PREV/MERGE_NEXT/NO_MERGE/MERGE_BOTH]
-            REASON: [简短理由]
-            """
+        ## 简化要求
+        1. 使用更简洁的表达方式，使得简化后文本汉字数量小于原始文本汉字数量
+        2. 保持核心语义不变，去除冗余词汇
+        3. 与上下文保持语义连贯
+        4. 尽量保持语言的自然流畅
+
+        ## 回复格式
+        SIMPLIFIED_TEXT: [简化后的文本]
+        REASON: [简要说明简化策略]
+        """
     
-    def _get_llm_decision(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """获取LLM合并决策"""
+    def _get_llm_simplification(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """获取LLM文本简化结果"""
         if not self.client:
-            return {'action': 'NO_MERGE', 'reason': 'LLM未配置'}
+            return {'action': 'NO_CHANGE', 'reason': 'LLM未配置', 'original_text': context['current'].text}
         
-        prompt = self._build_context_prompt(context)
-        print(prompt)
+        prompt = self._build_simplification_prompt(context)
         
         try:
             response = self.client.chat.completions.create(
@@ -234,32 +201,33 @@ class LLMContextOptimizer:
             )
             
             result = response.choices[0].message.content.strip()
-            print("--------------------------------")
-            print(result)
+            
             # 解析LLM响应
             lines = result.split('\n')
-            decision = 'NO_MERGE'
-            reason = 'LLM未返回有效决策'
+            simplified_text = context['current'].text
+            reason = 'LLM未返回有效简化文本'
             
             for line in lines:
-                if line.startswith('DECISION:'):
-                    decision = line.split(':', 1)[1].strip()
+                if line.startswith('SIMPLIFIED_TEXT:'):
+                    simplified_text = line.split(':', 1)[1].strip().strip('"')
                 elif line.startswith('REASON:'):
                     reason = line.split(':', 1)[1].strip()
             
             return {
-                'action': decision,
+                'action': 'SIMPLIFY',
                 'reason': reason,
+                'original_text': context['current'].text,
+                'simplified_text': simplified_text,
                 'context': context
             }
             
         except Exception as e:
-            self.logger.error(f"LLM决策失败: {e}")
-            return {'action': 'NO_MERGE', 'reason': str(e)}
+            self.logger.error(f"LLM简化失败: {e}")
+            return {'action': 'NO_CHANGE', 'reason': str(e), 'original_text': context['current'].text}
     
     def optimize_subtitles(self, entries) -> tuple[list, OptimizationReport]:
         """
-        使用LLM优化字幕
+        使用LLM优化字幕（文本简化版）
         
         Args:
             entries: 字幕条目列表
@@ -267,102 +235,80 @@ class LLMContextOptimizer:
         Returns:
             优化后的字幕条目列表和优化报告
         """
-        if not entries or len(entries) < 2:
+        if not entries:
             return entries, OptimizationReport(len(entries), len(entries), 0, [])
         
         if not self.client:
             self.logger.info("LLM未配置，跳过优化")
             return entries, OptimizationReport(len(entries), len(entries), 0, [])
         
-        self.logger.step("开始LLM字幕优化")
+        self.logger.step("开始LLM字幕文本简化优化")
         
-        # 1. 识别高密度字幕
+        # 1. 识别时长不足的字幕
         contexts = self.identify_high_density_contexts(entries)
         
         if not contexts:
-            self.logger.info("未发现高密度字幕，无需优化")
+            self.logger.info("未发现时长不足的字幕，无需优化")
             return entries, OptimizationReport(len(entries), len(entries), 0, [])
         
-        self.logger.info(f"发现{len(contexts)}个高密度字幕")
+        self.logger.info(f"发现{len(contexts)}个时长不足的字幕")
         
-        # 2. LLM决策
+        # 2. LLM文本简化
         decisions = []
         for context in contexts:
-            decision = self._get_llm_decision(context)
+            decision = self._get_llm_simplification(context)
             decisions.append(decision)
         
-        # 3. 执行合并决策
-        optimized = self._execute_decisions(entries, decisions)
+        # 3. 执行文本简化
+        optimized = self._execute_simplifications(entries, decisions)
         
         # 4. 生成报告
+        simplified_count = len([d for d in decisions if d['action'] == 'SIMPLIFY'])
         report = OptimizationReport(
             original_entries=len(entries),
             optimized_entries=len(optimized),
-            merged_count=len(entries) - len(optimized),
+            simplified_count=simplified_count,
             decisions=decisions
         )
         
-        self.logger.success(f"LLM优化完成：合并{report.merged_count}个字幕")
+        self.logger.success(f"LLM优化完成：简化{report.simplified_count}个字幕")
         return optimized, report
     
-    def _execute_decisions(self, entries: list, decisions: List[Dict[str, Any]]) -> list:
-        """执行LLM合并决策"""
+    def _execute_simplifications(self, entries: list, decisions: List[Dict[str, Any]]) -> list:
+        """执行LLM文本简化决策"""
         if not decisions:
             return entries
         
-        # 从后向前执行，避免索引偏移
-        decisions.sort(key=lambda x: x['context']['index'], reverse=True)
-        
-        optimized = entries.copy()
+        optimized = [entry for entry in entries]  # 创建副本
         
         # 延迟导入避免循环导入
         from ai_dubbing.src.parsers.srt_parser import SRTEntry
         
         for decision in decisions:
             action = decision['action']
+            if action != 'SIMPLIFY':
+                continue
+                
             idx = decision['context']['index']
-            
             if idx >= len(optimized):
                 continue
             
-            if action == "MERGE_PREV" and idx > 0:
-                optimized = self._merge_entries(optimized, idx-1, idx, SRTEntry)
-                
-            elif action == "MERGE_NEXT" and idx < len(optimized) - 1:
-                optimized = self._merge_entries(optimized, idx, idx+1, SRTEntry)
-                
-            elif action == "MERGE_BOTH" and 1 <= idx < len(optimized) - 1:
-                optimized = self._merge_three_entries(optimized, idx-1, idx, idx+1, SRTEntry)
+            original_entry = optimized[idx]
+            simplified_text = decision['simplified_text']
+            
+            # 创建新的简化字幕条目
+            simplified_entry = SRTEntry(
+                index=original_entry.index,
+                start_time=original_entry.start_time,
+                end_time=original_entry.end_time,
+                text=simplified_text
+            )
+            
+            optimized[idx] = simplified_entry
+            self.logger.info(f"简化字幕{idx+1}: '{original_entry.text}' → '{simplified_text}'")
         
         return optimized
     
-    def _merge_entries(self, entries: list, idx1: int, idx2: int, entry_class) -> list:
-        """合并两个字幕条目"""
-        if idx1 >= len(entries) or idx2 >= len(entries):
-            return entries
-        
-        new_entry = entry_class(
-            index=idx1 + 1,
-            start_time=entries[idx1].start_time,
-            end_time=entries[idx2].end_time,
-            text=entries[idx1].text.strip() + " " + entries[idx2].text.strip()
-        )
-        
-        return entries[:idx1] + [new_entry] + entries[idx2+1:]
-    
-    def _merge_three_entries(self, entries: list, idx1: int, idx2: int, idx3: int, entry_class) -> list:
-        """合并三个字幕条目"""
-        if max(idx1, idx2, idx3) >= len(entries):
-            return entries
-        
-        new_entry = entry_class(
-            index=idx1 + 1,
-            start_time=entries[idx1].start_time,
-            end_time=entries[idx3].end_time,
-            text=" ".join([entries[idx1].text.strip(), entries[idx2].text.strip(), entries[idx3].text.strip()])
-        )
-        
-        return entries[:idx1] + [new_entry] + entries[idx3+1:]
     
     def save_optimized_srt(self, optimized_entries: list, 
                           original_path: str, 

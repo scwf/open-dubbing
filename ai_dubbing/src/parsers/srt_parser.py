@@ -8,7 +8,7 @@ import re
 from typing import List, NamedTuple, Optional
 from pathlib import Path
 from ai_dubbing.src.logger import get_logger
-from ai_dubbing.src.utils.subtitle_optimizer import LLMContextOptimizer, SRTEntry
+from ai_dubbing.src.utils.subtitle_optimizer import SRTEntry
 
 class SRTParser:
     """SRT文件解析器"""
@@ -18,13 +18,8 @@ class SRTParser:
         r'(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})'
     )
     
-    def __init__(self, auto_optimize: bool = True, 
-                 api_key: Optional[str] = None,
-                 model: str = "deepseek-chat",
-                 base_url: str = "https://api.deepseek.com"):
+    def __init__(self):
         self.entries: List[SRTEntry] = []
-        self.auto_optimize = auto_optimize
-        self.optimizer = LLMContextOptimizer(api_key=api_key, model=model, base_url=base_url)
     
     @staticmethod
     def time_to_seconds(hours: int, minutes: int, seconds: int, milliseconds: int) -> float:
@@ -167,26 +162,8 @@ class SRTParser:
         
         entries = self.parse_content(content)
         
-        # 自动优化字幕
-        if self.auto_optimize and entries:
-            logger.info("开始自动优化字幕...")
-            optimized_entries, report = self.optimizer.optimize_subtitles(entries)
-            
-            if report.merged_count > 0:
-                # 保存优化后的字幕
-                optimized_path = self.optimizer.save_optimized_srt(
-                    optimized_entries, str(file_path)
-                )
-                logger.info(f"优化字幕已保存: {optimized_path}")
-                
-                # 更新使用优化后的字幕
-                self.entries = optimized_entries
-                logger.success(self.optimizer.generate_optimization_summary(report))
-            else:
-                logger.info("字幕无需优化")
-        
         logger.success(f"SRT解析完成，共 {len(self.entries)} 个有效条目")
-        return self.entries
+        return entries
     
     def validate_entries(self, entries: List[SRTEntry]) -> bool:
         """
