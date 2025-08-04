@@ -15,20 +15,20 @@ from openai import OpenAI
 class SRTEntry(NamedTuple):
     """SRT条目数据结构"""
     index: int
-    start_time: float  # 秒
-    end_time: float    # 秒
+    start_time: int  # 毫秒
+    end_time: int    # 毫秒
     text: str
     
     @property
-    def duration(self) -> float:
-        """获取持续时间（秒）"""
+    def duration(self) -> int:
+        """获取持续时间（毫秒）"""
         return self.end_time - self.start_time
 
 
 class SubtitleTimingConstants:
     """字幕时间计算常量"""
-    CHINESE_CHAR_TIME = 0.13  # 每个中文字符的默认朗读时间（秒）
-    ENGLISH_WORD_TIME = 0.25  # 每个英文单词的默认朗读时间（秒）
+    CHINESE_CHAR_TIME = 130  # 每个中文字符的默认朗读时间（毫秒）- 约0.13秒
+    ENGLISH_WORD_TIME = 250  # 每个英文单词的默认朗读时间（毫秒）- 约0.25秒
 
 
 class OptimizationReport(NamedTuple):
@@ -44,20 +44,20 @@ class TimeBorrowOptimizer:
     """时间借用优化器"""
     
     def __init__(self, 
-                 min_gap_threshold: float = 0.3,
+                 min_gap_threshold: int = 300,
                  borrow_ratio: float = 0.5,
-                 extra_buffer: float = 0.2,
-                 chinese_char_time: float = None,
-                 english_word_time: float = None):
+                 extra_buffer: int = 200,
+                 chinese_char_time: int = None,
+                 english_word_time: int = None):
         """
         初始化时间借用优化器
         
         Args:
-            min_gap_threshold: 最小保护空隙（秒）
+            min_gap_threshold: 最小保护空隙（毫秒）
             borrow_ratio: 借用比例（0.1-0.8）
-            extra_buffer: 额外缓冲时间（秒）
-            chinese_char_time: 每个中文字符的朗读时间（秒），默认为SubtitleTimingConstants.CHINESE_CHAR_TIME
-            english_word_time: 每个英文单词的朗读时间（秒），默认为SubtitleTimingConstants.ENGLISH_WORD_TIME
+            extra_buffer: 额外缓冲时间（毫秒）
+            chinese_char_time: 每个中文字符的朗读时间（毫秒），默认为SubtitleTimingConstants.CHINESE_CHAR_TIME
+            english_word_time: 每个英文单词的朗读时间（毫秒），默认为SubtitleTimingConstants.ENGLISH_WORD_TIME
         """
         self.min_gap_threshold = min_gap_threshold
         self.borrow_ratio = borrow_ratio
@@ -66,13 +66,13 @@ class TimeBorrowOptimizer:
         self.english_word_time = english_word_time or SubtitleTimingConstants.ENGLISH_WORD_TIME
         self.logger = get_logger()
     
-    def calculate_needed_extension(self, text: str, current_duration: float) -> float:
+    def calculate_needed_extension(self, text: str, current_duration: int) -> int:
         """计算需要延长的时间"""
         min_required = self._calculate_minimum_duration(text)
         needed = max(0, min_required - current_duration)
         return needed
     
-    def _calculate_minimum_duration(self, text: str) -> float:
+    def _calculate_minimum_duration(self, text: str) -> int:
         """基于字符密度计算最小所需时长"""
         chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
         english_words = len(re.findall(r'[a-zA-Z]+', text))
@@ -82,7 +82,7 @@ class TimeBorrowOptimizer:
         
         return chinese_duration + english_duration
     
-    def can_borrow_time(self, prev_gap: float, next_gap: float) -> tuple[bool, float, float]:
+    def can_borrow_time(self, prev_gap: int, next_gap: int) -> tuple[bool, int, int]:
         """
         判断是否可以借用时间
         
@@ -92,14 +92,14 @@ class TimeBorrowOptimizer:
         front_available = max(0, prev_gap - self.min_gap_threshold)
         back_available = max(0, next_gap - self.min_gap_threshold)
         
-        front_borrow = front_available * self.borrow_ratio
-        back_borrow = back_available * self.borrow_ratio
+        front_borrow = int(front_available * self.borrow_ratio)
+        back_borrow = int(back_available * self.borrow_ratio)
         
         total_available = front_borrow + back_borrow
         
         return (total_available > 0, front_borrow, back_borrow)
     
-    def adjust_timing(self, entry: SRTEntry, front_borrow: float, back_borrow: float) -> SRTEntry:
+    def adjust_timing(self, entry: SRTEntry, front_borrow: int, back_borrow: int) -> SRTEntry:
         """调整字幕时间"""
         new_start = max(0, entry.start_time - front_borrow)
         new_end = entry.end_time + back_borrow
@@ -145,8 +145,8 @@ class TimeBorrowOptimizer:
             if total_borrowed >= total_needed:
                 # 时间借用成功，按比例分配借用时间
                 ratio = min(1.0, total_needed / total_borrowed)
-                actual_front = front_borrow * ratio
-                actual_back = back_borrow * ratio
+                actual_front = int(front_borrow * ratio)
+                actual_back = int(back_borrow * ratio)
                 
                 adjusted_entry = self.adjust_timing(entry, actual_front, actual_back)
                 optimized.append(adjusted_entry)
@@ -182,11 +182,11 @@ class LLMContextOptimizer:
                  api_key: Optional[str] = None,
                  model: str = "deepseek-chat",
                  base_url: str = "https://api.deepseek.com",
-                 chinese_char_min_time: float = None,
-                 english_word_min_time: float = None,
-                 min_gap_threshold: float = 0.3,
+                 chinese_char_min_time: int = None,
+                 english_word_min_time: int = None,
+                 min_gap_threshold: int = 300,
                  borrow_ratio: float = 0.5,
-                 extra_buffer: float = 0.2):
+                 extra_buffer: int = 200):
         """
         初始化LLM优化器（集成时间借用）
         
@@ -194,11 +194,11 @@ class LLMContextOptimizer:
             api_key: DeepSeek API密钥
             model: LLM模型名称
             base_url: API基础URL
-            chinese_char_min_time: 每个中文字最小时间(秒)，默认为SubtitleTimingConstants.CHINESE_CHAR_TIME
-            english_word_min_time: 每个英文单词最小时间(秒)，默认为SubtitleTimingConstants.ENGLISH_WORD_TIME
-            min_gap_threshold: 最小保护空隙（秒）
+            chinese_char_min_time: 每个中文字最小时间(毫秒)，默认为SubtitleTimingConstants.CHINESE_CHAR_TIME
+            english_word_min_time: 每个英文单词最小时间(毫秒)，默认为SubtitleTimingConstants.ENGLISH_WORD_TIME
+            min_gap_threshold: 最小保护空隙（毫秒）
             borrow_ratio: 借用比例（0.1-0.8）
-            extra_buffer: 额外缓冲时间（秒）
+            extra_buffer: 额外缓冲时间（毫秒）
         """
         self.api_key = api_key
         self.model = model
@@ -222,13 +222,13 @@ class LLMContextOptimizer:
             self.client = None
             self.logger.warning("LLM优化器未配置，将跳过文本简化")
     
-    def calculate_minimum_duration(self, text: str) -> tuple[float, str]:
+    def calculate_minimum_duration(self, text: str) -> tuple[int, str]:
         """基于最小时间阈值计算字幕的最小所需时长"""
         chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
         english_words = len(re.findall(r'[a-zA-Z]+', text))
         
-        chinese_duration = chinese_chars * self.chinese_char_min_time
-        english_duration = english_words * self.english_word_min_time
+        chinese_duration = int(chinese_chars * self.chinese_char_min_time)
+        english_duration = int(english_words * self.english_word_min_time)
         min_duration = chinese_duration + english_duration
         
         if chinese_chars > 0 and english_words > 0:
@@ -334,8 +334,8 @@ class LLMContextOptimizer:
             self.logger.warning(f"⚠️ 仍有 {short_duration_count} 条字幕时长不足最小时长")
             for detail in short_duration_details[:5]:  # 只显示前5条
                 self.logger.warning(
-                    f"字幕{detail['index']}: 当前{detail['current_duration']:.2f}s, "
-                    f"需要{detail['min_required']:.2f}s, 缺少{detail['shortage']:.2f}s"
+                    f"字幕{detail['index']}: 当前{detail['current_duration']}ms, "
+                    f"需要{detail['min_required']}ms, 缺少{detail['shortage']}ms"
                 )
         else:
             self.logger.success("✅ 所有字幕时长均满足最小时长要求")
@@ -395,8 +395,8 @@ class LLMContextOptimizer:
 
         ## 需要简化的字幕
         - 原始文本："{current.text}"
-        - 当前时长：{current.duration:.2f}秒
-        - 需要达到的最小时长：{min_required:.2f}秒
+        - 当前时长：{current.duration}毫秒
+        - 需要达到的最小时长：{min_required}毫秒
 
         ## 简化要求
         1. 使用更简洁的表达方式，使得简化后文本汉字数量小于原始文本汉字数量
@@ -496,8 +496,8 @@ class LLMContextOptimizer:
                 new_entry = entry._replace(index=i+1)
                 
                 # 格式化为SRT格式
-                start_time_str = SRTParser.seconds_to_time(new_entry.start_time)
-                end_time_str = SRTParser.seconds_to_time(new_entry.end_time)
+                start_time_str = SRTParser.milliseconds_to_time(new_entry.start_time)
+                end_time_str = SRTParser.milliseconds_to_time(new_entry.end_time)
                 
                 f.write(f"{new_entry.index}\n")
                 f.write(f"{start_time_str} --> {end_time_str}\n")

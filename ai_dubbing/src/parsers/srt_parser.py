@@ -22,9 +22,9 @@ class SRTParser:
         self.entries: List[SRTEntry] = []
     
     @staticmethod
-    def time_to_seconds(hours: int, minutes: int, seconds: int, milliseconds: int) -> float:
+    def time_to_milliseconds(hours: int, minutes: int, seconds: int, milliseconds: int) -> int:
         """
-        将时间转换为秒数
+        将时间转换为毫秒数
         
         Args:
             hours: 小时
@@ -33,25 +33,25 @@ class SRTParser:
             milliseconds: 毫秒
             
         Returns:
-            总秒数（浮点数）
+            总毫秒数（整数）
         """
-        return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000.0
+        return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds
     
     @staticmethod
-    def seconds_to_time(total_seconds: float) -> str:
+    def milliseconds_to_time(total_milliseconds: int) -> str:
         """
-        将秒数转换为SRT时间格式
+        将毫秒数转换为SRT时间格式
         
         Args:
-            total_seconds: 总秒数
+            total_milliseconds: 总毫秒数
             
         Returns:
             SRT格式时间字符串 (HH:MM:SS,mmm)
         """
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        seconds = int(total_seconds % 60)
-        milliseconds = int((total_seconds % 1) * 1000)
+        hours = total_milliseconds // 3600000
+        minutes = (total_milliseconds % 3600000) // 60000
+        seconds = (total_milliseconds % 60000) // 1000
+        milliseconds = total_milliseconds % 1000
         return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
     
     
@@ -94,15 +94,15 @@ class SRTParser:
                 if not time_match:
                     raise ValueError(f"时间戳格式错误: {time_line}")
                 
-                # 解析开始和结束时间
-                start_time = self.time_to_seconds(
+                # 解析开始和结束时间（毫秒）
+                start_time = self.time_to_milliseconds(
                     int(time_match.group(1)),  # 小时
                     int(time_match.group(2)),  # 分钟  
                     int(time_match.group(3)),  # 秒
                     int(time_match.group(4))   # 毫秒
                 )
                 
-                end_time = self.time_to_seconds(
+                end_time = self.time_to_milliseconds(
                     int(time_match.group(5)),  # 小时
                     int(time_match.group(6)),  # 分钟
                     int(time_match.group(7)),  # 秒
@@ -193,25 +193,3 @@ class SRTParser:
                 logger.warning(f"条目 {entry.index} 与前一条目时间重叠")
         
         return True
-    
-    def get_total_duration(self) -> float:
-        """获取总时长（秒）"""
-        if not self.entries:
-            return 0.0
-        return max(entry.end_time for entry in self.entries)
-    
-    def filter_by_time_range(self, start_time: float, end_time: float) -> List[SRTEntry]:
-        """
-        按时间范围过滤条目
-        
-        Args:
-            start_time: 开始时间（秒）
-            end_time: 结束时间（秒）
-            
-        Returns:
-            过滤后的条目列表
-        """
-        return [
-            entry for entry in self.entries
-            if entry.end_time > start_time and entry.start_time < end_time
-        ] 

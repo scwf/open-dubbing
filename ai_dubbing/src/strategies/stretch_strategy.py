@@ -240,9 +240,14 @@ class StretchStrategy(TimeSyncStrategy):
                     **kwargs
                 )
                 
-                # 2. 计算时长和变速比例
+                # 2. 计算时长和变速比例（添加buffer防止溢出）
                 source_duration = len(audio_data) / sampling_rate
-                target_duration = entry.duration
+                
+                # 自适应buffer：0.2%时长，最小5ms，最大15ms
+                buffer_ratio = 0.002
+                buffer_duration = max(entry.duration * buffer_ratio, 5)  # 单位：毫秒
+                buffer_duration = min(buffer_duration, 15)  # 单位：毫秒
+                target_duration = max((entry.duration - buffer_duration) / 1000.0, 0.01)  # 转换为秒，确保不小于10ms
                 
                 if target_duration == 0:
                     processed_audio = audio_data

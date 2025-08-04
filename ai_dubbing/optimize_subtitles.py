@@ -61,11 +61,11 @@ def load_config_from_file(config_file=None):
         'api_key': get_config_value(config, '字幕优化配置', 'llm_api_key'),
         'model': get_config_value(config, '字幕优化配置', 'llm_model', 'deepseek-chat'),
         'base_url': get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com'),
-        'chinese_char_min_time': get_config_value(config, '字幕优化配置', 'chinese_char_min_time', 0.13, float),
-        'english_word_min_time': get_config_value(config, '字幕优化配置', 'english_word_min_time', 0.25, float),
-        'min_gap_threshold': get_config_value(config, '时间借用配置', 'min_gap_threshold', 0.3, float),
+        'chinese_char_min_time': get_config_value(config, '字幕优化配置', 'chinese_char_min_time', 130, int),
+        'english_word_min_time': get_config_value(config, '字幕优化配置', 'english_word_min_time', 250, int),
+        'min_gap_threshold': get_config_value(config, '时间借用配置', 'min_gap_threshold', 300, int),
         'borrow_ratio': get_config_value(config, '时间借用配置', 'borrow_ratio', 0.5, float),
-        'extra_buffer': get_config_value(config, '时间借用配置', 'extra_buffer', 0.2, float)
+        'extra_buffer': get_config_value(config, '时间借用配置', 'extra_buffer', 200, int)
     }
     
     return llm_config
@@ -140,7 +140,7 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
         return optimized_path
         
     except Exception as e:
-        logger.error(f"字幕优化失败: {str(e)}")
+        logger.error(f"字幕优化失败: {str(e)}", exc_info=True)
         return None
 
 def main():
