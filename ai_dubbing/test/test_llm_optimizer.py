@@ -38,7 +38,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         
         # 中文字符数量 * 0.13秒
         chinese_chars = len(text)  # 每个字符都算
-        expected_duration = chinese_chars * 0.13
+        expected_duration = chinese_chars * 130
         
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
         self.assertEqual(lang_type, 'chinese')
@@ -50,7 +50,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         
         # 英文单词数量 * 0.25秒
         english_words = 8  # 8个英文单词
-        expected_duration = english_words * 0.25
+        expected_duration = english_words * 250
         
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
         self.assertEqual(lang_type, 'english')
@@ -60,7 +60,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "这是一个test混合的字幕subtitle"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        expected_duration = 9 * 0.13 + 2 * 0.25
+        expected_duration = 9 * 130 + 2 * 250
         self.assertEqual(lang_type, 'mixed_cn9_en2')
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
     
@@ -69,14 +69,14 @@ class TestLLMContextOptimizer(unittest.TestCase):
         # 中文字符测试
         text = "正常字幕"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
-        expected = len(text) * 0.13
+        expected = len(text) * 130
         self.assertAlmostEqual(min_duration, expected, places=2)
         self.assertEqual(lang_type, 'chinese')
         
         # 英文单词测试
         text = "This is test"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
-        expected = 3 * 0.25  # 3个英文单词
+        expected = 3 * 250  # 3个英文单词
         self.assertAlmostEqual(min_duration, expected, places=2)
         self.assertEqual(lang_type, 'english')
     
@@ -147,7 +147,7 @@ class TestLLMIntegration(unittest.TestCase):
         
         # 验证时间格式
         self.assertEqual(entries[0].start_time, 0.0)
-        self.assertEqual(entries[0].end_time, 1.52)
+        self.assertEqual(entries[0].end_time, 1520)
         
     def test_duration_analysis_on_sample(self):
         """测试对样本字幕进行时长分析"""
@@ -203,28 +203,28 @@ class TestTimeBorrowOptimizer(unittest.TestCase):
         """测试需要延长时间的计算"""
         # 时间充足的字幕
         text = "正常字幕文本"
-        current_duration = 2.0
+        current_duration = 2000
         needed = self.borrower.calculate_needed_extension(text, current_duration)
         self.assertEqual(needed, 0)
         
         # 时间不足的字幕
         text = "这是一个很长的字幕文本需要更多时间"
-        current_duration = 1.0
+        current_duration = 1000
         needed = self.borrower.calculate_needed_extension(text, current_duration)
         self.assertGreater(needed, 0)
     
     def test_can_borrow_time(self):
         """测试时间借用判断"""
         # 空隙充足
-        prev_gap = 1.0
-        next_gap = 1.0
+        prev_gap = 1000
+        next_gap = 1000
         can_borrow, front, back = self.borrower.can_borrow_time(prev_gap, next_gap)
         self.assertTrue(can_borrow)
         self.assertGreater(front + back, 0)
         
         # 空隙不足
-        prev_gap = 0.1
-        next_gap = 0.1
+        prev_gap = 100
+        next_gap = 100
         can_borrow, front, back = self.borrower.can_borrow_time(prev_gap, next_gap)
         self.assertFalse(can_borrow)
         self.assertEqual(front + back, 0)

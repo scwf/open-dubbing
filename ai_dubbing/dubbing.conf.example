@@ -26,21 +26,21 @@ strategy = basic
 language = zh
 
 [字幕优化配置]
-# LLM优化器配置
-# LLM API密钥（可选，不配置则跳过LLM优化）
-llm_api_key = 
-
-# LLM模型选择
+llm_api_key = sk-xxxxxxxxxxxxxxxxxx
 llm_model = deepseek-chat
 base_url = https://api.deepseek.com
-
-# 时间阈值配置（秒/字符或秒/单词）
-chinese_char_min_time = 0.15  # 每个中文字最小时间
-english_word_min_time = 0.4   # 每个英文单词最小时间
-
-# LLM优化文件后缀
-llm_optimized_suffix = _llm_optimized
+#单位毫秒
+chinese_char_min_time = 130
+english_word_min_time = 250
 
 # 优化后的SRT文件输出路径（可选，默认在输入文件同目录）
-output_file = /path/to/optimized_subtitles.srt
+output_file = /home/xiaofei/code/open-dubbing/input/sample3_optimized.srt
+
+[时间借用配置]
+# 最小保护空隙（毫秒），小于此值的空隙不借用
+min_gap_threshold = 300
+# 借用比例（0.1-0.8），从可用空隙中借用的比例
+borrow_ratio = 0.5
+# 额外缓冲时间（毫秒），在计算需要延长时间时的安全余量
+extra_buffer = 200
 

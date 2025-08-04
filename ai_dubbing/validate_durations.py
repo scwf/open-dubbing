@@ -29,8 +29,8 @@ class DurationValidator:
         初始化验证器
         
         Args:
-            chinese_char_time: 每个中文字符的朗读时间（秒）
-            english_word_time: 每个英文单词的朗读时间（秒）
+            chinese_char_time: 每个中文字符的朗读时间（毫秒）
+            english_word_time: 每个英文单词的朗读时间（毫秒）
         """
         self.chinese_char_time = chinese_char_time
         self.english_word_time = english_word_time
@@ -111,9 +111,9 @@ class DurationValidator:
                     self.logger.warning(
                         f"字幕{entry['index']}: "
                         f"{entry['text']}, "
-                        f"当前{entry['current_duration']:.2f}s, "
-                        f"需要{entry['min_required']:.2f}s, "
-                        f"缺少{entry['shortage']:.2f}s "
+                        f"当前{entry['current_duration']:.2f}ms, "
+                        f"需要{entry['min_required']:.2f}ms, "
+                        f"缺少{entry['shortage']:.2f}ms "
                         f"({entry['shortage_ratio']:.1f}%)")
                 
                 if short_count > 10:
@@ -135,9 +135,9 @@ def main():
     parser.add_argument('file', help='SRT字幕文件路径')
     parser.add_argument('-v', '--verbose', action='store_true', help='显示详细信息', default=True)
     parser.add_argument('--chinese-time', type=float, default=SubtitleTimingConstants.CHINESE_CHAR_TIME,
-                        help=f'中文字符朗读时间(秒)，默认{SubtitleTimingConstants.CHINESE_CHAR_TIME}')
+                        help=f'中文字符朗读时间(毫秒)，默认{SubtitleTimingConstants.CHINESE_CHAR_TIME}')
     parser.add_argument('--english-time', type=float, default=SubtitleTimingConstants.ENGLISH_WORD_TIME,
-                        help=f'英文单词朗读时间(秒)，默认{SubtitleTimingConstants.ENGLISH_WORD_TIME}')
+                        help=f'英文单词朗读时间(毫秒)，默认{SubtitleTimingConstants.ENGLISH_WORD_TIME}')
     
     args = parser.parse_args()
     

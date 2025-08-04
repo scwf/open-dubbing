@@ -130,11 +130,11 @@ class AudioProcessor:
         sorted_segments = sorted(segments, key=lambda x: x['start_time'])
         
         # 计算准确的结束时间（基于字幕文件的时间轴）
-        max_end_time = max(seg['end_time'] for seg in sorted_segments)
-        total_samples = int(max_end_time * self.sample_rate)
+        max_end_time_ms = max(seg['end_time'] for seg in sorted_segments)
+        total_samples = int(max_end_time_ms * self.sample_rate // 1000)  # 使用整数运算避免浮点精度损失
         
         logger.debug("时间同步合并详情:")
-        logger.debug(f"  字幕总时长: {max_end_time:.2f}s")
+        logger.debug(f"  字幕总时长: {max_end_time_ms / 1000:.2f}s")
         logger.debug(f"  总样本数: {total_samples}")
         
         # 创建固定大小的音频数组
@@ -154,16 +154,16 @@ class AudioProcessor:
                 continue
             
             # 计算精确的时间位置
-            start_sample = int(segment['start_time'] * self.sample_rate)
-            end_sample = int(segment['end_time'] * self.sample_rate)
+            start_sample = int(segment['start_time'] * self.sample_rate // 1000)
+            end_sample = int(segment['end_time'] * self.sample_rate // 1000)
             
             # 计算目标时长对应的样本数
             target_length = end_sample - start_sample
             actual_length = len(audio_data)
             
-            expected_duration = segment['end_time'] - segment['start_time']
+            expected_duration = (segment['end_time'] - segment['start_time']) / 1000.0
             actual_duration = actual_length / self.sample_rate
-            logger.debug(f"  片段 {i+1}: 字幕时间={segment['start_time']:.2f}-{segment['end_time']:.2f}s, "
+            logger.debug(f"  片段 {i+1}: 字幕时间={(segment['start_time']/1000.0):.2f}-{(segment['end_time']/1000.0):.2f}s, "
                        f"字幕时长={expected_duration:.2f}s, 音频时长={actual_duration:.2f}s")
             
             # 处理音频长度与字幕时长的匹配
