@@ -314,6 +314,32 @@ class LLMContextOptimizer:
             else:
                 all_decisions.append(d)
         
+        # 最终验证：检查还有多少字幕时长不足
+        short_duration_count = 0
+        short_duration_details = []
+        
+        for entry in llm_optimized:
+            min_duration, _ = self.calculate_minimum_duration(entry.text)
+            if entry.duration < min_duration:
+                short_duration_count += 1
+                short_duration_details.append({
+                    'index': entry.index,
+                    'text': entry.text,
+                    'current_duration': entry.duration,
+                    'min_required': min_duration,
+                    'shortage': min_duration - entry.duration
+                })
+        
+        if short_duration_count > 0:
+            self.logger.warning(f"⚠️ 仍有 {short_duration_count} 条字幕时长不足最小时长")
+            for detail in short_duration_details[:5]:  # 只显示前5条
+                self.logger.warning(
+                    f"字幕{detail['index']}: 当前{detail['current_duration']:.2f}s, "
+                    f"需要{detail['min_required']:.2f}s, 缺少{detail['shortage']:.2f}s"
+                )
+        else:
+            self.logger.success("✅ 所有字幕时长均满足最小时长要求")
+        
         report = OptimizationReport(
             original_entries=len(entries),
             optimized_entries=len(llm_optimized),
@@ -323,7 +349,8 @@ class LLMContextOptimizer:
         )
         
         self.logger.success(
-            f"优化完成：时间借用{time_borrowed_count}条，LLM简化{simplified_count}条"
+            f"优化完成：时间借用{time_borrowed_count}条，LLM简化{simplified_count}条，"
+            f"时长不足{short_duration_count}条"
         )
         return llm_optimized, report
     
