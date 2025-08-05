@@ -10,12 +10,12 @@
 """
 import numpy as np
 import tempfile
-import subprocess
 import os
 from typing import List, Dict, Any, Optional
+import ffmpeg
 
 from ai_dubbing.src.tts_engines.base_engine import BaseTTSEngine
-from ai_dubbing.src.config import AUDIO, STRATEGY, LOG
+from ai_dubbing.src.config import STRATEGY, LOG
 from ai_dubbing.src.parsers.srt_parser import SRTEntry
 from ai_dubbing.src.strategies.base_strategy import TimeSyncStrategy
 from ai_dubbing.src.logger import get_logger, create_process_logger
@@ -38,6 +38,7 @@ class StretchStrategy(TimeSyncStrategy):
             mode: 变速模式 ("standard"=标准, "high_quality"=高质量, "ultra_wide"=超宽)
         """
         super().__init__(tts_engine)
+        self.logger = get_logger()
         
         # 根据模式选择变速范围
         if max_speed_ratio is None and min_speed_ratio is None:
@@ -66,80 +67,78 @@ class StretchStrategy(TimeSyncStrategy):
             
         Returns:
             精确匹配目标时长的音频数据
-        """
+        """            
         source_duration = len(audio_data) / sampling_rate
         if source_duration <= 0:
             return audio_data
             
         # 计算变速比例
-        rate = source_duration / target_duration
+        original_rate = source_duration / target_duration
         
         # 限制变速范围
-        rate = np.clip(rate, self.min_speed_ratio, self.max_speed_ratio)
+        rate = np.clip(original_rate, self.min_speed_ratio, self.max_speed_ratio)
         
-        if abs(rate - 1.0) <= STRATEGY.TIME_STRETCH_THRESHOLD:
-            # 时长接近，直接调整长度
+        if rate != original_rate:
+            self.logger.warning(f"变速比例超出限制范围，已调整: {original_rate:.3f} → {rate:.3f} ")
+        
+        if rate <= 1.0:
+            # 实际时长小于等于目标时长：直接填充静音
             target_samples = int(target_duration * sampling_rate)
             return self._adjust_length_precisely(audio_data, target_samples)
             
-        # 使用内存管道避免临时文件
+        # 实际时长大于目标时长：使用FFmpeg压缩音频
         try:
             import io
             import scipy.io.wavfile as wav
             
-            # 创建内存中的WAV数据
-            wav_buffer = io.BytesIO()
-            wav.write(wav_buffer, sampling_rate, (audio_data * 32767).astype(np.int16))
-            wav_buffer.seek(0)
+            # 使用ffmpeg-python的内存管道
+            input_buffer = io.BytesIO()
+            wav.write(input_buffer, sampling_rate, (audio_data * 32767).astype(np.int16))
+            input_buffer.seek(0)
             
-            # 构建FFmpeg命令，使用管道
-            cmd = [
-                'ffmpeg', '-y',
-                '-f', 'wav', '-i', 'pipe:0',  # 从stdin读取
-                '-filter_complex', f'atempo={rate}',
-                '-ar', str(sampling_rate),
-                '-ac', '1',
-                '-sample_fmt', 's16',
-                '-f', 'wav', 'pipe:1'  # 输出到stdout
-            ]
-            
-            # 执行FFmpeg命令
-            result = subprocess.run(
-                cmd, 
-                input=wav_buffer.getvalue(),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True
+            # 使用ffmpeg-python同步处理音频
+            output_data, _ = (
+                ffmpeg
+                .input('pipe:', format='wav')
+                .filter('atempo', rate)
+                .output('pipe:', format='wav', 
+                       ar=sampling_rate, 
+                       ac=1, 
+                       sample_fmt='s16',
+                       loglevel='error')
+                .overwrite_output()
+                .run(input=input_buffer.getvalue(), capture_stdout=True, capture_stderr=True)
             )
             
-            # 从输出读取音频数据
-            output_buffer = io.BytesIO(result.stdout)
-            rate_out, processed_audio = wav.read(output_buffer)
+            if not output_data:
+                raise ValueError("FFmpeg输出为空")
+            
+            # 读取处理后的音频
+            output_buffer = io.BytesIO(output_data)
+            _, processed_audio = wav.read(output_buffer)
+            
+            if processed_audio is None or len(processed_audio) == 0:
+                raise ValueError("FFmpeg未能生成有效音频数据")
+            
             processed_audio = processed_audio.astype(np.float32) / 32767.0
             
-            # 验证并精确调整时长
-            actual_duration = len(processed_audio) / sampling_rate
-            duration_diff = abs(actual_duration - target_duration)
+            # # 验证并精确调整时长
+            # actual_duration = len(processed_audio) / sampling_rate
+            # duration_diff = abs(actual_duration - target_duration)
             
-            if duration_diff > 0.01:  # 10ms误差容限
-                logger = get_logger()
-                logger.debug(f"FFmpeg变速后时长微调: {actual_duration:.3f}s -> {target_duration:.3f}s")
-                target_samples = int(target_duration * sampling_rate)
-                return self._adjust_length_precisely(processed_audio, target_samples)
+            # if duration_diff > 0.01:  # 10ms误差容限
+            #     self.logger.info(f"FFmpeg变速后时长微调: {actual_duration:.3f}s -> {target_duration:.3f}s")
+            #     target_samples = int(target_duration * sampling_rate)
+            #     return self._adjust_length_precisely(processed_audio, target_samples)
             
             return processed_audio
             
-        except subprocess.CalledProcessError as e:
-            logger = get_logger()
-            logger.error(f"FFmpeg处理失败: {e.stderr.decode() if e.stderr else str(e)}")
-            # 降级到精确长度调整
-            target_samples = int(target_duration * sampling_rate)
-            return self._adjust_length_precisely(audio_data, target_samples)
         except Exception as e:
-            logger = get_logger()
-            logger.error(f"音频处理失败: {e}")
-            target_samples = int(target_duration * sampling_rate)
-            return self._adjust_length_precisely(audio_data, target_samples)
+            error_msg = str(e)
+            if hasattr(e, 'stderr') and e.stderr:
+                error_msg = e.stderr.decode()
+            self.logger.error(f"FFmpeg处理失败: {error_msg}")
+            raise RuntimeError(f"FFmpeg处理失败: {error_msg}") from e
     
     def _adjust_length_precisely(self, audio_data: np.ndarray, target_samples: int) -> np.ndarray:
         """
@@ -158,6 +157,7 @@ class StretchStrategy(TimeSyncStrategy):
             return audio_data
         elif current_samples > target_samples:
             # 截断到精确长度
+            self.logger.warning(f"音频长度超过目标长度，将被截断: {current_samples} → {target_samples} 样本")
             return audio_data[:target_samples]
         else:
             # 填充静音到精确长度
@@ -165,30 +165,6 @@ class StretchStrategy(TimeSyncStrategy):
             padding = np.zeros(padding_samples, dtype=np.float32)
             return np.concatenate([audio_data, padding])
     
-    def _pad_with_silence(self, audio_data: np.ndarray, sampling_rate: int, target_duration: float) -> np.ndarray:
-        """
-        使用静音填充音频到目标时长
-        
-        Args:
-            audio_data: 原始音频数据
-            sampling_rate: 采样率
-            target_duration: 目标时长（秒）
-            
-        Returns:
-            填充后的音频数据
-        """
-        source_duration = len(audio_data) / sampling_rate
-        if source_duration >= target_duration:
-            return audio_data
-            
-        padding_duration = target_duration - source_duration
-        padding_samples = int(padding_duration * sampling_rate)
-        
-        if padding_samples > 0:
-            silence = np.zeros(padding_samples, dtype=np.float32)
-            return np.concatenate([audio_data, silence])
-        
-        return audio_data
     
     @staticmethod
     def name() -> str:
@@ -233,50 +209,45 @@ class StretchStrategy(TimeSyncStrategy):
                 text_preview = entry.text[:LOG.PROGRESS_TEXT_PREVIEW_LENGTH] + "..." if len(entry.text) > LOG.PROGRESS_TEXT_PREVIEW_LENGTH else entry.text
                 process_logger.progress(i + 1, len(entries), f"条目 {entry.index}: {text_preview}")
                 
-                # 1. 合成原始语音 - 使用注入的TTS引擎
-                assert self.tts_engine is not None, "TTS引擎未被注入"
                 audio_data, sampling_rate = self.tts_engine.synthesize(
                     text=entry.text,
                     **kwargs
                 )
+                # 临时测试代码：保存音频文件
+                # import scipy.io.wavfile as wav_test
+                # import os
+                # test_output_dir = "/tmp/dubbing_tests"
+                # os.makedirs(test_output_dir, exist_ok=True)
+                # test_filename = os.path.join(test_output_dir, f"test_entry_original_{entry.index}.wav")
+                # wav_test.write(test_filename, sampling_rate, (audio_data * 32767).astype(np.int16))
+                # self.logger.info(f"临时测试: 音频已保存到 {test_filename}")
                 
-                # 2. 计算时长和变速比例（添加buffer防止溢出）
-                source_duration = len(audio_data) / sampling_rate
+                # 自适应buffer：0.5%时长，最小10ms，最大50ms
+                buffer_ratio = 0.005
+                buffer_duration = max(entry.duration * buffer_ratio, 10)  # 单位：毫秒
+                buffer_duration = min(buffer_duration, 50)  # 单位：毫秒
+                target_duration = max((entry.duration - buffer_duration) / 1000.0, 0.1)  # 转换为秒，确保不小于100ms
                 
-                # 自适应buffer：0.2%时长，最小5ms，最大15ms
-                buffer_ratio = 0.002
-                buffer_duration = max(entry.duration * buffer_ratio, 5)  # 单位：毫秒
-                buffer_duration = min(buffer_duration, 15)  # 单位：毫秒
-                target_duration = max((entry.duration - buffer_duration) / 1000.0, 0.01)  # 转换为秒，确保不小于10ms
-                
-                if target_duration == 0:
-                    processed_audio = audio_data
-                else:
-                    # 3. 根据时长关系选择处理策略
-                    if source_duration < target_duration:
-                        # 音频时长小于字幕时长：用静音拼接
-                        processed_audio = self._pad_with_silence(
-                            audio_data, sampling_rate, target_duration
-                        )
-                        padding_duration = target_duration - source_duration
-                        logger.debug(
-                            f"条目 {entry.index} 音频偏短 {padding_duration:.2f}s，已用静音填充"
-                        )
-                    elif source_duration > target_duration:
-                        # 音频时长大于字幕时长：使用FFmpeg atempo滤镜
-                        processed_audio = self._apply_atempo_filter(
-                            audio_data, sampling_rate, target_duration
-                        )
-                        logger.debug(
-                            f"条目 {entry.index} 使用FFmpeg atempo滤镜调整播放速率"
-                        )
-                    else:
-                        # 时长完全匹配
-                        processed_audio = audio_data
+                # 使用统一的音频时长调整逻辑
+                processed_audio = self._apply_atempo_filter(
+                    audio_data, sampling_rate, target_duration
+                )
+
+                target_samples = int(entry.duration * sampling_rate / 1000.0)
+                result_audio = self._adjust_length_precisely(processed_audio, target_samples)
+
+                # 临时测试代码：保存音频文件
+                # import scipy.io.wavfile as wav_test
+                # import os
+                # test_output_dir = "/tmp/dubbing_tests"
+                # os.makedirs(test_output_dir, exist_ok=True)
+                # test_filename = os.path.join(test_output_dir, f"test_entry_{entry.index}.wav")
+                # wav_test.write(test_filename, sampling_rate, (result_audio * 32767).astype(np.int16))
+                # self.logger.info(f"临时测试: 音频已保存到 {test_filename}")
 
                 # 4. 创建音频片段
                 segment = {
-                    'audio_data': processed_audio,
+                    'audio_data': result_audio,
                     'start_time': entry.start_time,
                     'end_time': entry.end_time,
                     'text': entry.text,
@@ -287,27 +258,7 @@ class StretchStrategy(TimeSyncStrategy):
 
             except Exception as e:
                 logger.error(f"条目 {entry.index} 处理失败: {e}")
-                # 后备方案：创建静音片段
-                default_sr = AUDIO.DEFAULT_SAMPLE_RATE
-                silence_data = np.zeros(int(entry.duration * default_sr), dtype=np.float32)
-                segment = {
-                    'audio_data': silence_data,
-                    'start_time': entry.start_time,
-                    'end_time': entry.end_time,
-                    'text': entry.text,
-                    'index': entry.index,
-                    'duration': entry.duration
-                }
-                audio_segments.append(segment)
+                raise RuntimeError(f"条目 {entry.index} 处理失败: {e}") from e
         
         process_logger.complete(f"生成 {len(audio_segments)} 个音频片段")
         return audio_segments
-
-# 注册逻辑将移至 __init__.py 中，以更好地管理
-# def _register_stretch_strategy():
-#     """注册时间拉伸策略"""
-#     from ai_dubbing.src.strategies import _strategy_registry
-#     _strategy_registry['stretch'] = StretchStrategy
-
-# # 在模块导入时自动注册
-# _register_stretch_strategy() 
