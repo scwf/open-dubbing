@@ -38,6 +38,7 @@ class StretchStrategy(TimeSyncStrategy):
             mode: 变速模式 ("standard"=标准, "high_quality"=高质量, "ultra_wide"=超宽)
         """
         super().__init__(tts_engine)
+        self.logger = get_logger()
         
         # 根据模式选择变速范围
         if max_speed_ratio is None and min_speed_ratio is None:
@@ -72,17 +73,20 @@ class StretchStrategy(TimeSyncStrategy):
             return audio_data
             
         # 计算变速比例
-        rate = source_duration / target_duration
+        original_rate = source_duration / target_duration
         
         # 限制变速范围
-        rate = np.clip(rate, self.min_speed_ratio, self.max_speed_ratio)
+        rate = np.clip(original_rate, self.min_speed_ratio, self.max_speed_ratio)
         
-        if abs(rate - 1.0) <= STRATEGY.TIME_STRETCH_THRESHOLD:
-            # 时长接近，直接调整长度
+        if rate != original_rate:
+            self.logger.warning(f"变速比例超出限制范围，已调整: {original_rate:.3f} → {rate:.3f} ")
+        
+        if rate <= 1.0:
+            # 实际时长小于等于目标时长：直接填充静音
             target_samples = int(target_duration * sampling_rate)
             return self._adjust_length_precisely(audio_data, target_samples)
             
-        # 使用内存管道避免临时文件
+        # 实际时长大于目标时长：使用FFmpeg压缩音频
         try:
             import io
             import scipy.io.wavfile as wav
@@ -114,7 +118,7 @@ class StretchStrategy(TimeSyncStrategy):
             
             # 从输出读取音频数据
             output_buffer = io.BytesIO(result.stdout)
-            rate_out, processed_audio = wav.read(output_buffer)
+            _, processed_audio = wav.read(output_buffer)
             processed_audio = processed_audio.astype(np.float32) / 32767.0
             
             # 验证并精确调整时长
@@ -122,22 +126,19 @@ class StretchStrategy(TimeSyncStrategy):
             duration_diff = abs(actual_duration - target_duration)
             
             if duration_diff > 0.01:  # 10ms误差容限
-                logger = get_logger()
-                logger.debug(f"FFmpeg变速后时长微调: {actual_duration:.3f}s -> {target_duration:.3f}s")
+                self.logger.debug(f"FFmpeg变速后时长微调: {actual_duration:.3f}s -> {target_duration:.3f}s")
                 target_samples = int(target_duration * sampling_rate)
                 return self._adjust_length_precisely(processed_audio, target_samples)
             
             return processed_audio
             
         except subprocess.CalledProcessError as e:
-            logger = get_logger()
-            logger.error(f"FFmpeg处理失败: {e.stderr.decode() if e.stderr else str(e)}")
+            self.logger.error(f"FFmpeg处理失败: {e.stderr.decode() if e.stderr else str(e)}")
             # 降级到精确长度调整
             target_samples = int(target_duration * sampling_rate)
             return self._adjust_length_precisely(audio_data, target_samples)
         except Exception as e:
-            logger = get_logger()
-            logger.error(f"音频处理失败: {e}")
+            self.logger.error(f"音频处理失败: {e}")
             target_samples = int(target_duration * sampling_rate)
             return self._adjust_length_precisely(audio_data, target_samples)
     
@@ -158,6 +159,7 @@ class StretchStrategy(TimeSyncStrategy):
             return audio_data
         elif current_samples > target_samples:
             # 截断到精确长度
+            self.logger.warning(f"音频长度超过目标长度，将被截断: {current_samples} → {target_samples} 样本")
             return audio_data[:target_samples]
         else:
             # 填充静音到精确长度
@@ -165,30 +167,6 @@ class StretchStrategy(TimeSyncStrategy):
             padding = np.zeros(padding_samples, dtype=np.float32)
             return np.concatenate([audio_data, padding])
     
-    def _pad_with_silence(self, audio_data: np.ndarray, sampling_rate: int, target_duration: float) -> np.ndarray:
-        """
-        使用静音填充音频到目标时长
-        
-        Args:
-            audio_data: 原始音频数据
-            sampling_rate: 采样率
-            target_duration: 目标时长（秒）
-            
-        Returns:
-            填充后的音频数据
-        """
-        source_duration = len(audio_data) / sampling_rate
-        if source_duration >= target_duration:
-            return audio_data
-            
-        padding_duration = target_duration - source_duration
-        padding_samples = int(padding_duration * sampling_rate)
-        
-        if padding_samples > 0:
-            silence = np.zeros(padding_samples, dtype=np.float32)
-            return np.concatenate([audio_data, silence])
-        
-        return audio_data
     
     @staticmethod
     def name() -> str:
@@ -255,11 +233,10 @@ class StretchStrategy(TimeSyncStrategy):
                     # 3. 根据时长关系选择处理策略
                     if source_duration < target_duration:
                         # 音频时长小于字幕时长：用静音拼接
-                        processed_audio = self._pad_with_silence(
-                            audio_data, sampling_rate, target_duration
-                        )
+                        target_samples = int(target_duration * sampling_rate)
+                        processed_audio = self._adjust_length_precisely(audio_data, target_samples)
                         padding_duration = target_duration - source_duration
-                        logger.debug(
+                        self.logger.debug(
                             f"条目 {entry.index} 音频偏短 {padding_duration:.2f}s，已用静音填充"
                         )
                     elif source_duration > target_duration:
