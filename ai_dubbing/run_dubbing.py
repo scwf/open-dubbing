@@ -158,9 +158,7 @@ def main():
         processor = AudioProcessor()
         merged_audio = processor.merge_audio_segments(
             audio_segments,
-            strategy_name=strategy_name,
-            truncate_on_overflow=False
-        )
+            strategy_name=strategy_name)
         
         process_logger.step("导出音频文件")
         if not processor.export_audio(merged_audio, output_file):

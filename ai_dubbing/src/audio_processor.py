@@ -29,8 +29,7 @@ class AudioProcessor:
     
 
     def merge_audio_segments(self, segments: List[Dict[str, Any]], 
-                           strategy_name: str = "stretch",
-                           truncate_on_overflow: bool = False) -> np.ndarray:
+                           strategy_name: str = "stretch") -> np.ndarray:
         """
         根据策略类型合并音频片段
         
@@ -40,9 +39,6 @@ class AudioProcessor:
                 - start_time: 开始时间
                 - end_time: 结束时间
             strategy_name: 策略名称 ("basic", "stretch")
-            truncate_on_overflow: 当音频时长溢出字幕时长时，是否截断音频。
-                                      False (默认): 保留完整音频，即使它超出字幕时间（自然拼接）。
-                                      True: 在字幕结束时切断音频，以保证严格的时间同步。
         
         Returns:
             合并后的音频数据
@@ -58,7 +54,7 @@ class AudioProcessor:
             return self._natural_concatenation(segments)
         else:
             logger.info(f"使用时间同步模式进行音频合并 (策略: {strategy_name})")
-            return self._time_synchronized_merge(segments, truncate_on_overflow)
+            return self._time_synchronized_merge(segments)
 
     
     def _natural_concatenation(self, segments: List[Dict[str, Any]]) -> np.ndarray:
@@ -104,19 +100,17 @@ class AudioProcessor:
         
         return merged_audio
     
-    def _time_synchronized_merge(self, segments: List[Dict[str, Any]], truncate_on_overflow: bool) -> np.ndarray:
+    def _time_synchronized_merge(self, segments: List[Dict[str, Any]]) -> np.ndarray:
         """
         时间同步合并模式：严格按照字幕时间轴对齐音频片段
         
-        修复后的逻辑：
+        简化后的逻辑：
         1. 使用字幕文件的总时长作为基准
         2. 严格按照字幕的start_time和end_time放置音频
-        3. 处理音频长度与字幕时长的精确匹配
-        4. 支持截断或填充以保证时间轴对齐
+        3. 音频片段已在前序处理中匹配字幕时长，无需额外处理
         
         Args:
-            segments: 音频片段列表
-            truncate_on_overflow: 当音频时长溢出字幕时长时，是否截断音频。
+            segments: 音频片段列表（已匹配字幕时长）
             
         Returns:
             合并后的音频数据，严格对齐字幕时间轴
@@ -140,7 +134,7 @@ class AudioProcessor:
         # 创建固定大小的音频数组
         merged_audio = np.zeros(total_samples, dtype=np.float32)
         
-        # 将每个音频片段精确放置到字幕时间轴
+        # 将每个音频片段精确放置到字幕时间轴（音频已匹配字幕时长）
         for i, segment in enumerate(sorted_segments):
             audio_data = segment['audio_data']
             
@@ -156,52 +150,22 @@ class AudioProcessor:
             # 计算精确的时间位置
             start_sample = int(segment['start_time'] * self.sample_rate // 1000)
             end_sample = int(segment['end_time'] * self.sample_rate // 1000)
-            
-            # 计算目标时长对应的样本数
             target_length = end_sample - start_sample
-            actual_length = len(audio_data)
             
-            expected_duration = (segment['end_time'] - segment['start_time']) / 1000.0
-            actual_duration = actual_length / self.sample_rate
-            logger.debug(f"  片段 {i+1}: 字幕时间={(segment['start_time']/1000.0):.2f}-{(segment['end_time']/1000.0):.2f}s, "
-                       f"字幕时长={expected_duration:.2f}s, 音频时长={actual_duration:.2f}s")
-            
-            # 处理音频长度与字幕时长的匹配
-            if actual_length > target_length:
-                # 音频比字幕长
-                if truncate_on_overflow:
-                    # 截断音频以匹配字幕时长
-                    audio_data = audio_data[:target_length]
-                    logger.debug(f"    ✓ 截断音频到 {target_length} 样本")
-                else:
-                    # 当不截断时，允许音频超出字幕时长，但只放置到字幕时间范围内
-                    logger.debug(f"    ⚠ 音频超出字幕时长 {actual_length - target_length} 样本，超出部分将被截断")
-                    # 不截断，让后续边界检查处理
-            
-            elif actual_length < target_length:
-                # 音频比字幕短，填充静音
-                padding_length = target_length - actual_length
-                padding = np.zeros(padding_length, dtype=np.float32)
-                audio_data = np.concatenate([audio_data, padding])
-                logger.debug(f"    ✓ 填充静音 {padding_length} 样本")
-            
-            # 精确放置到时间轴（确保不越界）
-            actual_end = min(start_sample + len(audio_data), total_samples)
-            actual_start = min(start_sample, total_samples)
-            
-            if actual_start < actual_end:
-                # 计算实际能放置的音频长度
-                actual_length_to_place = actual_end - actual_start
-                audio_to_place = audio_data[:actual_length_to_place]
-                merged_audio[actual_start:actual_end] = audio_to_place
-                
-                if len(audio_data) > actual_length_to_place and not truncate_on_overflow:
-                    truncated_samples = len(audio_data) - actual_length_to_place
-                    logger.debug(f"    ⚠ 音频被截断 {truncated_samples} 样本（超出字幕结束时间）")
-                else:
-                    logger.debug(f"    ✓ 已放置: {actual_start}-{actual_end} 样本")
+            # 音频已在前序处理中匹配字幕时长，直接放置
+            if target_length == len(audio_data):
+                # 完美匹配，直接放置
+                merged_audio[start_sample:end_sample] = audio_data
+                logger.debug(f"    ✓ 已放置: {start_sample}-{end_sample} 样本")
+            elif len(audio_data) <= target_length:
+                # 音频较短或正好，放置后剩余部分为静音（已在前面处理过）
+                actual_end = start_sample + len(audio_data)
+                merged_audio[start_sample:actual_end] = audio_data
+                logger.debug(f"    ✓ 已放置: {start_sample}-{actual_end} 样本")
             else:
-                logger.warning(f"片段 {i+1} 超出音频范围，跳过")
+                # 音频较长，截断到字幕时长（理论上不应发生，安全处理）
+                merged_audio[start_sample:end_sample] = audio_data[:target_length]
+                logger.warning(f"    ⚠ 音频被截断到字幕时长: {target_length} 样本")
         
         # 防止音频过载（混音时可能超过[-1,1]范围）
         max_val = np.max(np.abs(merged_audio))
