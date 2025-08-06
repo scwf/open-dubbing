@@ -70,6 +70,9 @@ class StrategyConfig:
     SILENCE_THRESHOLD = 0.5
     BASIC_MAX_SPEED_RATIO = 1.2
     BASIC_MIN_SPEED_RATIO = 0.8
+    
+    # 调试功能开关
+    ENABLE_SAVE_ENTRY_WAVFILE = False  # 是否保存各个字幕条目的音频文件到临时目录
 
 
 class IndexTTSConfig:
@@ -218,6 +221,7 @@ class LogConfig:
     ERROR_PREFIX = "错误"
     WARNING_PREFIX = "警告"
     INFO_PREFIX = "信息"
+
 
 
 # 全局配置实例

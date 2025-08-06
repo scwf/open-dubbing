@@ -213,14 +213,15 @@ class StretchStrategy(TimeSyncStrategy):
                     text=entry.text,
                     **kwargs
                 )
-                # 临时测试代码：保存音频文件
-                # import scipy.io.wavfile as wav_test
-                # import os
-                # test_output_dir = "/tmp/dubbing_tests"
-                # os.makedirs(test_output_dir, exist_ok=True)
-                # test_filename = os.path.join(test_output_dir, f"test_entry_original_{entry.index}.wav")
-                # wav_test.write(test_filename, sampling_rate, (audio_data * 32767).astype(np.int16))
-                # self.logger.info(f"临时测试: 音频已保存到 {test_filename}")
+                # 可选功能：保存原始音频文件
+                if STRATEGY.ENABLE_SAVE_ENTRY_WAVFILE:
+                    import scipy.io.wavfile as wav_test
+                    import os
+                    test_output_dir = "/tmp/dubbing_tests"
+                    os.makedirs(test_output_dir, exist_ok=True)
+                    test_filename = os.path.join(test_output_dir, f"original_entry_{entry.index}.wav")
+                    wav_test.write(test_filename, sampling_rate, (audio_data * 32767).astype(np.int16))
+                    self.logger.info(f"调试: 原始音频已保存到 {test_filename}")
                 
                 # 自适应buffer：0.5%时长，最小10ms，最大50ms
                 buffer_ratio = 0.005
@@ -236,14 +237,15 @@ class StretchStrategy(TimeSyncStrategy):
                 target_samples = int(entry.duration * sampling_rate / 1000.0)
                 result_audio = self._adjust_length_precisely(processed_audio, target_samples)
 
-                # 临时测试代码：保存音频文件
-                # import scipy.io.wavfile as wav_test
-                # import os
-                # test_output_dir = "/tmp/dubbing_tests"
-                # os.makedirs(test_output_dir, exist_ok=True)
-                # test_filename = os.path.join(test_output_dir, f"test_entry_{entry.index}.wav")
-                # wav_test.write(test_filename, sampling_rate, (result_audio * 32767).astype(np.int16))
-                # self.logger.info(f"临时测试: 音频已保存到 {test_filename}")
+                # 可选功能：保存处理后的音频文件
+                if STRATEGY.ENABLE_SAVE_ENTRY_WAVFILE:
+                    import scipy.io.wavfile as wav_test
+                    import os
+                    test_output_dir = "/tmp/dubbing_tests"
+                    os.makedirs(test_output_dir, exist_ok=True)
+                    test_filename = os.path.join(test_output_dir, f"stretch_entry_{entry.index}.wav")
+                    wav_test.write(test_filename, sampling_rate, (result_audio * 32767).astype(np.int16))
+                    self.logger.info(f"调试: 处理后音频已保存到 {test_filename}")
 
                 # 4. 创建音频片段
                 segment = {
