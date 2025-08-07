@@ -72,7 +72,7 @@ class StrategyConfig:
     BASIC_MIN_SPEED_RATIO = 0.8
     
     # 调试功能开关
-    ENABLE_SAVE_ENTRY_WAVFILE = False  # 是否保存各个字幕条目的音频文件到临时目录
+    ENABLE_SAVE_ENTRY_WAVFILE = True  # 是否保存各个字幕条目的音频文件到临时目录
 
 
 class IndexTTSConfig:
@@ -159,9 +159,9 @@ class FishSpeechConfig:
     # 推理参数默认值 - 优化音质和自然度
     DEFAULT_TEMPERATURE = 0.2  # 低温度保持稳定音质，匹配原始示例
     DEFAULT_TOP_P = 0.6  # 使用原始示例的top_p值
-    DEFAULT_REPETITION_PENALTY = 1.1  # 使用原始示例的重复惩罚值
-    DEFAULT_CHUNK_LENGTH = 100  # 使用原始示例的块长度
-    DEFAULT_MAX_NEW_TOKENS = 1024  # 使用原始示例的最大token数
+    DEFAULT_REPETITION_PENALTY = 1.2  # 使用原始示例的重复惩罚值
+    DEFAULT_CHUNK_LENGTH = 150  # 使用原始示例的块长度
+    DEFAULT_MAX_NEW_TOKENS = 2048  # 使用原始示例的最大token数
     DEFAULT_SEED = 42
     DEFAULT_USE_MEMORY_CACHE = "on"
 

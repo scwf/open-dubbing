@@ -37,9 +37,9 @@ class IndexTTSEngine(BaseTTSEngine):
             infer_signature = inspect.signature(self.tts_model.infer)
             self.valid_infer_params = set(infer_signature.parameters.keys())
             
-            logger.success(f"IndexTTS模型加载成功: {init_kwargs}")
+            logger.success(f"模型加载成功: {init_kwargs}")
         except Exception as e:
-            logger.error(f"IndexTTS模型加载失败: {e}")
+            logger.error(f"模型加载失败: {e}")
             raise RuntimeError(f"加载IndexTTS模型失败: {e}")
 
     def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:

@@ -28,13 +28,13 @@ class CosyVoiceEngine(BaseTTSEngine):
         logger.step("加载CosyVoice模型...")
         try:
             self.tts_model = CosyVoice2(**init_kwargs)
-            logger.success(f"CosyVoice模型加载成功: {init_kwargs}")
+            logger.success(f"模型加载成功: {init_kwargs}")
 
             # 使用内省机制，获取底层模型真正支持的参数列表
             infer_signature = inspect.signature(self.tts_model.inference_zero_shot)
             self.valid_infer_params = set(infer_signature.parameters.keys())
         except Exception as e:
-            logger.error(f"CosyVoice模型加载失败: {e}")
+            logger.error(f"模型加载失败: {e}")
             raise RuntimeError(f"加载CosyVoice模型失败: {e}")
 
     def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:
