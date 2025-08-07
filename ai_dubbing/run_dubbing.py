@@ -27,7 +27,7 @@ from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
 from ai_dubbing.src.tts_engines import get_tts_engine, TTS_ENGINES
 from ai_dubbing.src.audio_processor import AudioProcessor
-from ai_dubbing.src.logger import setup_logging, create_process_logger
+from ai_dubbing.src.logger import setup_logging, create_process_logger, get_logger
 
 # 初始化项目环境
 setup_project_path()
@@ -35,8 +35,11 @@ setup_project_path()
 def load_config(config_file=str(current_file.parent)+"/dubbing.conf"):
     """加载配置文件，返回配置字典"""
     if not os.path.exists(config_file):
-        print(f"错误: 配置文件 {config_file} 不存在")
-        print("请复制 dubbing.conf.example 为 dubbing.conf 并根据实际需求修改参数")
+        # 创建简单logger用于配置文件不存在的错误
+        setup_logging("INFO")
+        logger = get_logger()
+        logger.error(f"配置文件 {config_file} 不存在")
+        logger.info("请复制 dubbing.conf.example 为 dubbing.conf 并根据实际需求修改参数")
         sys.exit(1)
     
     config = configparser.ConfigParser()
@@ -57,6 +60,54 @@ def get_config_value(config, section, key, default=None, value_type=str):
     except (configparser.NoSectionError, configparser.NoOptionError):
         return default
 
+def parse_quoted_list(text):
+    """
+    解析带引号的逗号分隔列表
+    例如: '"文本1", "文本2", "文本3"' -> ['文本1', '文本2', '文本3']
+    也支持不带引号的简单列表: 'file1.wav, file2.wav' -> ['file1.wav', 'file2.wav']
+    """
+    if not text or not text.strip():
+        return []
+    
+    import re
+    # 匹配带引号的字符串或不带引号的简单字符串
+    pattern = r'"([^"]*?)"|([^,]+)'
+    matches = re.findall(pattern, text)
+    
+    result = []
+    for quoted, unquoted in matches:
+        if quoted:  # 带引号的字符串
+            result.append(quoted)
+        elif unquoted.strip():  # 不带引号的字符串，去掉前后空白
+            result.append(unquoted.strip())
+    
+    return result
+
+def get_multi_voice_config(config):
+    """
+    获取多对参考音频配置
+    
+    Returns:
+        tuple: (voice_files_list, prompt_texts_list)
+    """
+    voice_files_str = get_config_value(config, '基本配置', 'voice_files', None)
+    prompt_texts_str = get_config_value(config, '基本配置', 'prompt_texts', None)
+    
+    if not voice_files_str or not prompt_texts_str:
+        raise ValueError("必须同时配置 voice_files 和 prompt_texts")
+    
+    # 解析配置
+    voice_files = parse_quoted_list(voice_files_str)
+    prompt_texts = parse_quoted_list(prompt_texts_str)
+    
+    if not voice_files or not prompt_texts:
+        raise ValueError("voice_files 和 prompt_texts 不能为空")
+    
+    if len(voice_files) != len(prompt_texts):
+        raise ValueError(f"voice_files ({len(voice_files)}) 和 prompt_texts ({len(prompt_texts)}) 的数量不匹配")
+    
+    return voice_files, prompt_texts
+
 def main():
     """主函数：完全遵循cli.py的精确结构和逻辑"""
     
@@ -65,16 +116,24 @@ def main():
     
     # 解析配置参数（映射到cli.py的参数）
     input_file = get_config_value(config, '基本配置', 'input_file')
-    voice_file = get_config_value(config, '基本配置', 'voice_file')
     output_file = get_config_value(config, '基本配置', 'output_file', PATH.get_default_output_path())
     tts_engine = get_config_value(config, '基本配置', 'tts_engine', 'index_tts')
     strategy = get_config_value(config, '基本配置', 'strategy', 'stretch')
     lang = get_config_value(config, '高级配置', 'language', 'zh')
-    prompt_text = get_config_value(config, '基本配置', 'prompt_text', None)
+    
+    # 解析多对参考音频配置
+    voice_files, prompt_texts = get_multi_voice_config(config)
     
     # --- 初始化 ---
     start_time = time.time()
     setup_logging("INFO")
+    
+    # 创建logger并打印每一对参考音频和文本配置
+    logger = get_logger()
+    logger.info(f"配置了 {len(voice_files)} 对参考音频和文本:")
+    for i, (voice_file, prompt_text) in enumerate(zip(voice_files, prompt_texts), 1):
+        logger.info(f"  {i}. 音频: {voice_file}")
+        logger.info(f"     文本: {prompt_text}")
     
     process_logger = create_process_logger("配置文件配音任务")
     
@@ -83,14 +142,15 @@ def main():
     is_txt_mode = file_extension == '.txt'
     
     if not os.path.exists(input_file):
-        print(f"错误: 输入文件不存在: {input_file}")
+        logger.error(f"输入文件不存在: {input_file}")
         return 1
     
-    if not os.path.exists(voice_file):
-        print(f"错误: 参考语音文件不存在: {voice_file}")
-        return 1
+    for i, voice_file in enumerate(voice_files):
+        if not os.path.exists(voice_file):
+            logger.error(f"参考语音文件不存在: {voice_file}")
+            return 1
     
-    process_logger.start(f"输入: {input_file}, 引擎: {tts_engine}, 策略: {strategy}")
+    process_logger.start(f"输入: {input_file}, 引擎: {tts_engine}, 策略: {strategy}, 参考音频: {len(voice_files)}个")
 
     # --- 1. 初始化TTS引擎 ---
     try:
@@ -138,13 +198,15 @@ def main():
         
         # 将引擎特定的运行时参数传递给策略
         runtime_kwargs = {
-            "prompt_text": prompt_text,
-            "ref_text": prompt_text
+            "prompt_text": prompt_texts[0] if prompt_texts else None,  # 主要参考文本
+            "ref_text": prompt_texts[0] if prompt_texts else None,     # 兼容性
+            "voice_files": voice_files,        # 所有参考音频文件
+            "prompt_texts": prompt_texts,      # 所有参考文本
         }
         
         audio_segments = strategy.process_entries(
             entries,
-            voice_reference=voice_file,
+            voice_reference=voice_files[0],  # 主要参考音频
             **runtime_kwargs
         )
         process_logger.logger.success(f"成功生成 {len(audio_segments)} 个音频片段")

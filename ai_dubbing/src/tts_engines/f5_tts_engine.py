@@ -39,9 +39,10 @@ class F5TTSEngine(BaseTTSEngine):
             infer_signature = inspect.signature(self.tts_model.infer)
             self.valid_infer_params = set(infer_signature.parameters.keys())
             
-            logger.success("F5TTS模型加载成功")
+            logger.success("模型加载成功")
+
         except Exception as e:
-            logger.error(f"F5TTS模型加载失败: {e}")
+            logger.error(f"模型加载失败: {e}")
             raise RuntimeError(f"加载F5TTS模型失败: {e}")
 
     def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:

@@ -9,7 +9,7 @@ import numpy as np
 
 from ai_dubbing.src.tts_engines.base_engine import BaseTTSEngine
 from ai_dubbing.src.utils import validate_file_exists
-from ai_dubbing.src.config import AUDIO, LOG
+from ai_dubbing.src.config import AUDIO, LOG, STRATEGY
 from ai_dubbing.src.parsers.srt_parser import SRTEntry
 from ai_dubbing.src.strategies.base_strategy import TimeSyncStrategy
 from ai_dubbing.src.logger import get_logger, create_process_logger
@@ -25,6 +25,7 @@ class BasicStrategy(TimeSyncStrategy):
             tts_engine: TTS引擎实例
         """
         super().__init__(tts_engine)
+        self.logger = get_logger()
     
     @staticmethod
     def name() -> str:
@@ -66,10 +67,20 @@ class BasicStrategy(TimeSyncStrategy):
                 process_logger.progress(i + 1, len(entries), f"条目 {entry.index}: {text_preview}")
                 
                 # 使用注入的TTS引擎合成语音
-                audio_data, _ = self.tts_engine.synthesize(
+                audio_data, sampling_rate = self.tts_engine.synthesize(
                     text=entry.text, 
                     **kwargs
                 )
+                
+                # 可选功能：保存音频文件
+                if STRATEGY.ENABLE_SAVE_ENTRY_WAVFILE:
+                    import scipy.io.wavfile as wav_test
+                    import os
+                    test_output_dir = "/tmp/dubbing_tests"
+                    os.makedirs(test_output_dir, exist_ok=True)
+                    test_filename = os.path.join(test_output_dir, f"basic_entry_{entry.index}.wav")
+                    wav_test.write(test_filename, sampling_rate, (audio_data * 32767).astype(np.int16))
+                    self.logger.info(f"调试: 基础策略音频已保存到 {test_filename}")
                 
                 segment = {
                     'audio_data': audio_data,

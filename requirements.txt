@@ -1,0 +1,8 @@
+ffmpeg-python
+librosa 
+numpy
+soundfile
+colorama
+tqdm 
+pysbd
+python-dotenv

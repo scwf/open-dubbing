@@ -6,6 +6,7 @@
 
 import logging
 import sys
+import inspect
 from typing import Optional
 from datetime import datetime
 
@@ -35,9 +36,35 @@ class SRTDubbingLogger:
         handler.setFormatter(logging.Formatter('%(message)s'))
         self.logger.addHandler(handler)
     
+    def _get_caller_class_name(self) -> str:
+        """自动获取调用者的类名"""
+        try:
+            # 获取调用栈，跳过当前方法和_format_message
+            frame = inspect.currentframe()
+            caller_frame = frame.f_back.f_back.f_back  # 跳过 _get_caller_class_name -> _format_message -> info/warning/error
+            
+            # 获取调用者的局部变量
+            caller_locals = caller_frame.f_locals
+            
+            # 检查是否在类实例方法中调用
+            if 'self' in caller_locals:
+                caller_class = caller_locals['self'].__class__.__name__
+                return f"[{caller_class}]"
+            
+            # 如果不在类方法中，尝试从代码对象获取函数名
+            caller_function = caller_frame.f_code.co_name
+            if caller_function != '<module>':
+                return f"[{caller_function}]"
+                
+            return ""
+        except:
+            # 如果获取失败，返回空字符串
+            return ""
+    
     def _format_message(self, level: str, message: str) -> str:
         """格式化日志消息"""
         timestamp = datetime.now().strftime("%H:%M:%S")
+        caller_info = self._get_caller_class_name()
         
         # 根据级别选择颜色
         color_map = {
@@ -51,16 +78,19 @@ class SRTDubbingLogger:
         
         color = color_map.get(level, "")
         
+        # 如果有调用者信息，添加到消息前
+        formatted_message = f"{caller_info} {message}" if caller_info else message
+        
         if level == "STEP":
-            return f"{color}🔄 [{timestamp}] {message}{Style.RESET_ALL}"
+            return f"{color}🔄 [{timestamp}] {formatted_message}{Style.RESET_ALL}"
         elif level == "SUCCESS":
-            return f"{color}✅ [{timestamp}] {message}{Style.RESET_ALL}"
+            return f"{color}✅ [{timestamp}] {formatted_message}{Style.RESET_ALL}"
         elif level == "WARNING":
-            return f"{color}⚠️  [{timestamp}] {message}{Style.RESET_ALL}"
+            return f"{color}⚠️  [{timestamp}] {formatted_message}{Style.RESET_ALL}"
         elif level == "ERROR":
-            return f"{color}❌ [{timestamp}] {message}{Style.RESET_ALL}"
+            return f"{color}❌ [{timestamp}] {formatted_message}{Style.RESET_ALL}"
         else:
-            return f"{color}[{timestamp}] {message}{Style.RESET_ALL}"
+            return f"{color}[{timestamp}] {formatted_message}{Style.RESET_ALL}"
     
     def info(self, message: str) -> None:
         """信息日志"""

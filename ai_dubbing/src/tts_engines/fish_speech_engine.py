@@ -45,15 +45,15 @@ class FishSpeechEngine(BaseTTSEngine):
         llama_path = init_kwargs["llama_checkpoint_path"]
         decoder_path = init_kwargs["decoder_checkpoint_path"]
         
-        logger.info(f"Fish Speech LLM路径: {llama_path}")
-        logger.info(f"Fish Speech Decoder路径: {decoder_path}")
+        logger.info(f"LLM路径: {llama_path}")
+        logger.info(f"Decoder路径: {decoder_path}")
         
         if not Path(llama_path).exists():
-            logger.error(f"Fish Speech LLM路径不存在: {llama_path}")
+            logger.error(f"LLM路径不存在: {llama_path}")
             raise FileNotFoundError(f"Fish Speech LLM路径不存在: {llama_path}")
         
         if not Path(decoder_path).exists():
-            logger.error(f"Fish Speech Decoder路径不存在: {decoder_path}")
+            logger.error(f"Decoder路径不存在: {decoder_path}")
             raise FileNotFoundError(f"Fish Speech Decoder路径不存在: {decoder_path}")
         
         try:
@@ -80,10 +80,10 @@ class FishSpeechEngine(BaseTTSEngine):
                 compile=init_kwargs["compile"],
             )
             
-            logger.success("Fish Speech模型加载成功")
+            logger.success("模型加载成功")
             
         except Exception as e:
-            logger.error(f"Fish Speech模型加载失败: {e}")
+            logger.error(f"模型加载失败: {e}")
             raise RuntimeError(f"加载Fish Speech模型失败: {e}")
 
     def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:
@@ -94,24 +94,21 @@ class FishSpeechEngine(BaseTTSEngine):
         :param kwargs: 其他参数，包括参考音频和文本
         :return: 音频数据和采样率的元组
         """
-        reference_audio_path = kwargs.get('voice_reference')
-        if not reference_audio_path:
-            raise ValueError("Fish Speech引擎需要参考音频文件 (voice_reference)")
-            
-        reference_text = kwargs.get('prompt_text')
-        if not reference_text:
-            raise ValueError("Fish Speech引擎需要参考音频对应的文本 (prompt_text)")
-
-        # 确保参考音频文件存在
-        if not Path(reference_audio_path).exists():
-            raise FileNotFoundError(f"参考音频文件未找到: {reference_audio_path}")
-
-        # 读取参考音频
-        try:
-            with open(reference_audio_path, "rb") as f:
-                reference_audio_bytes = f.read()
-        except Exception as e:
-            raise RuntimeError(f"读取参考音频失败: {e}")
+        # 获取参考音频配置
+        voice_files = kwargs.get('voice_files', [])
+        prompt_texts = kwargs.get('prompt_texts', [])
+        
+        # 读取所有参考音频
+        reference_audios = []
+        for audio_path, ref_text in zip(voice_files, prompt_texts):
+            try:
+                with open(audio_path, "rb") as f:
+                    audio_bytes = f.read()
+                reference_audios.append((audio_bytes, ref_text))
+            except Exception as e:
+                raise RuntimeError(f"读取参考音频失败 {audio_path}: {e}")
+        
+        logger.info(f"使用 {len(reference_audios)} 个参考音频进行语音合成")
 
         # 构建Fish Speech请求
         try:
@@ -133,14 +130,18 @@ class FishSpeechEngine(BaseTTSEngine):
                 "use_memory_cache": kwargs.get("use_memory_cache", default_params["use_memory_cache"]),
             })
 
+            # 为每个参考音频创建ServeReferenceAudio对象
+            references = [
+                ServeReferenceAudio(
+                    audio=audio_bytes,
+                    text=ref_text
+                )
+                for audio_bytes, ref_text in reference_audios
+            ]
+            
             request = ServeTTSRequest(
                 text=text,
-                references=[
-                    ServeReferenceAudio(
-                        audio=reference_audio_bytes,
-                        text=reference_text
-                    )
-                ],
+                references=references,
                 max_new_tokens=final_params["max_new_tokens"],
                 chunk_length=final_params["chunk_length"],
                 top_p=final_params["top_p"],
@@ -152,7 +153,7 @@ class FishSpeechEngine(BaseTTSEngine):
             )
             
             # 执行推理
-            logger.debug(f"Fish Speech请求参数: {final_params}")
+            logger.debug(f"请求参数: {final_params}")
             results = list(self.engine.inference(request))
             
             if not results:
@@ -164,12 +165,12 @@ class FishSpeechEngine(BaseTTSEngine):
                 sample_rate, audio_data = final_result.audio
                 
                 # 调试音频数据信息
-                logger.info(f"Fish Speech原始音频数据类型: {audio_data.dtype}")
-                logger.info(f"Fish Speech采样率: {sample_rate}")
+                logger.info(f"原始音频数据类型: {audio_data.dtype}")
+                logger.info(f"采样率: {sample_rate}")
                 
                 # 检查是否全静音
                 if np.abs(audio_data).max() < 0.01:
-                    logger.warning(f"Fish Speech返回的音频数据振幅过小: max={np.abs(audio_data).max():.6f}")
+                    logger.warning(f"返回的音频数据振幅过小: max={np.abs(audio_data).max():.6f}")
                 
                 # 确保音频数据是float32格式，保持Fish Speech的原生格式
                 if audio_data.dtype != np.float32:
