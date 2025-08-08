@@ -63,6 +63,10 @@ def load_config_from_file(config_file=None):
         'base_url': get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com'),
         'chinese_char_min_time': get_config_value(config, '字幕优化配置', 'chinese_char_min_time', 130, int),
         'english_word_min_time': get_config_value(config, '字幕优化配置', 'english_word_min_time', 250, int),
+        # 新增并发与重试配置（可选，提供默认）
+        'llm_max_concurrency': get_config_value(config, '字幕优化配置', 'llm_max_concurrency', 6, int),
+        'llm_max_retries': get_config_value(config, '字幕优化配置', 'llm_max_retries', 3, int),
+        'llm_timeout': get_config_value(config, '字幕优化配置', 'llm_timeout', 60, int),
         'min_gap_threshold': get_config_value(config, '时间借用配置', 'min_gap_threshold', 300, int),
         'borrow_ratio': get_config_value(config, '时间借用配置', 'borrow_ratio', 0.5, float),
         'extra_buffer': get_config_value(config, '时间借用配置', 'extra_buffer', 200, int)
@@ -116,7 +120,10 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
             english_word_min_time=config['english_word_min_time'],
             min_gap_threshold=config['min_gap_threshold'],
             borrow_ratio=config['borrow_ratio'],
-            extra_buffer=config['extra_buffer']
+            extra_buffer=config['extra_buffer'],
+            max_concurrency=config['llm_max_concurrency'],
+            max_retries=config['llm_max_retries'],
+            request_timeout=config['llm_timeout']
         )
         
         # 执行优化

@@ -18,7 +18,7 @@ from ai_dubbing.src.tts_engines.base_engine import BaseTTSEngine
 from ai_dubbing.src.config import STRATEGY, LOG
 from ai_dubbing.src.parsers.srt_parser import SRTEntry
 from ai_dubbing.src.strategies.base_strategy import TimeSyncStrategy
-from ai_dubbing.src.logger import get_logger, create_process_logger
+from ai_dubbing.src.logger import get_logger
 
 class StretchStrategy(TimeSyncStrategy):
     """时间拉伸同步策略实现"""
@@ -176,91 +176,48 @@ class StretchStrategy(TimeSyncStrategy):
         """策略描述"""
         return "时间拉伸策略：通过改变语速来精确匹配字幕时长（支持0.25-4.0倍速）"
 
-    def process_entries(self, entries: List[SRTEntry], **kwargs) -> List[Dict[str, Any]]:
-        """
-        处理SRT条目，生成与字幕时长精确匹配的音频片段
-        
-        优化逻辑：
-        1. 音频时长小于字幕时长：用静音拼接
-        2. 音频时长大于字幕时长：使用FFmpeg的atempo滤镜调整播放速率
-        
-        Args:
-            entries: SRT条目列表
-            **kwargs: 可选参数
-                - voice_reference: 参考语音文件路径
-        
-        Returns:
-            音频片段信息列表
-        """
-        logger = get_logger()
+    def synthesize_one(self, entry: SRTEntry, **kwargs) -> Dict[str, Any]:
+        """合成单条字幕并进行时长匹配（由基类并发调度）"""
         voice_reference = kwargs.get('voice_reference')
         if not voice_reference:
             raise ValueError("必须提供参考语音文件路径 (voice_reference)")
-        
-        audio_segments = []
-        
-        # 创建处理进度日志器
-        process_logger = create_process_logger("时间拉伸策略音频生成")
-        process_logger.start(f"处理 {len(entries)} 个字幕条目")
-        
-        for i, entry in enumerate(entries):
-            try:
-                # 始终显示进度，不仅仅在verbose模式下
-                text_preview = entry.text[:LOG.PROGRESS_TEXT_PREVIEW_LENGTH] + "..." if len(entry.text) > LOG.PROGRESS_TEXT_PREVIEW_LENGTH else entry.text
-                process_logger.progress(i + 1, len(entries), f"条目 {entry.index}: {text_preview}")
-                
-                audio_data, sampling_rate = self.tts_engine.synthesize(
-                    text=entry.text,
-                    **kwargs
-                )
-                # 可选功能：保存原始音频文件
-                if STRATEGY.ENABLE_SAVE_ENTRY_WAVFILE:
-                    import scipy.io.wavfile as wav_test
-                    import os
-                    test_output_dir = "/tmp/dubbing_tests"
-                    os.makedirs(test_output_dir, exist_ok=True)
-                    test_filename = os.path.join(test_output_dir, f"original_entry_{entry.index}.wav")
-                    wav_test.write(test_filename, sampling_rate, (audio_data * 32767).astype(np.int16))
-                    self.logger.info(f"调试: 原始音频已保存到 {test_filename}")
-                
-                # 自适应buffer：0.5%时长，最小10ms，最大50ms
-                buffer_ratio = 0.005
-                buffer_duration = max(entry.duration * buffer_ratio, 10)  # 单位：毫秒
-                buffer_duration = min(buffer_duration, 50)  # 单位：毫秒
-                target_duration = max((entry.duration - buffer_duration) / 1000.0, 0.1)  # 转换为秒，确保不小于100ms
-                
-                # 使用统一的音频时长调整逻辑
-                processed_audio = self._apply_atempo_filter(
-                    audio_data, sampling_rate, target_duration
-                )
 
-                target_samples = int(entry.duration * sampling_rate / 1000.0)
-                result_audio = self._adjust_length_precisely(processed_audio, target_samples)
+        audio_data, sampling_rate = self.tts_engine.synthesize(
+            text=entry.text,
+            **kwargs
+        )
 
-                # 可选功能：保存处理后的音频文件
-                if STRATEGY.ENABLE_SAVE_ENTRY_WAVFILE:
-                    import scipy.io.wavfile as wav_test
-                    import os
-                    test_output_dir = "/tmp/dubbing_tests"
-                    os.makedirs(test_output_dir, exist_ok=True)
-                    test_filename = os.path.join(test_output_dir, f"stretch_entry_{entry.index}.wav")
-                    wav_test.write(test_filename, sampling_rate, (result_audio * 32767).astype(np.int16))
-                    self.logger.info(f"调试: 处理后音频已保存到 {test_filename}")
+        if STRATEGY.ENABLE_SAVE_ENTRY_WAVFILE:
+            import scipy.io.wavfile as wav_test
+            import os
+            test_output_dir = "/tmp/dubbing_tests"
+            os.makedirs(test_output_dir, exist_ok=True)
+            test_filename = os.path.join(test_output_dir, f"original_entry_{entry.index}.wav")
+            wav_test.write(test_filename, sampling_rate, (audio_data * 32767).astype(np.int16))
+            self.logger.info(f"调试: 原始音频已保存到 {test_filename}")
 
-                # 4. 创建音频片段
-                segment = {
-                    'audio_data': result_audio,
-                    'start_time': entry.start_time,
-                    'end_time': entry.end_time,
-                    'text': entry.text,
-                    'index': entry.index,
-                    'duration': entry.duration
-                }
-                audio_segments.append(segment)
+        buffer_ratio = 0.005
+        buffer_duration = max(entry.duration * buffer_ratio, 10)
+        buffer_duration = min(buffer_duration, 50)
+        target_duration = max((entry.duration - buffer_duration) / 1000.0, 0.1)
+        processed_audio = self._apply_atempo_filter(audio_data, sampling_rate, target_duration)
+        target_samples = int(entry.duration * sampling_rate / 1000.0)
+        result_audio = self._adjust_length_precisely(processed_audio, target_samples)
 
-            except Exception as e:
-                logger.error(f"条目 {entry.index} 处理失败: {e}")
-                raise RuntimeError(f"条目 {entry.index} 处理失败: {e}") from e
-        
-        process_logger.complete(f"生成 {len(audio_segments)} 个音频片段")
-        return audio_segments
+        if STRATEGY.ENABLE_SAVE_ENTRY_WAVFILE:
+            import scipy.io.wavfile as wav_test
+            import os
+            test_output_dir = "/tmp/dubbing_tests"
+            os.makedirs(test_output_dir, exist_ok=True)
+            test_filename = os.path.join(test_output_dir, f"stretch_entry_{entry.index}.wav")
+            wav_test.write(test_filename, sampling_rate, (result_audio * 32767).astype(np.int16))
+            self.logger.info(f"调试: 处理后音频已保存到 {test_filename}")
+
+        return {
+            'audio_data': result_audio,
+            'start_time': entry.start_time,
+            'end_time': entry.end_time,
+            'text': entry.text,
+            'index': entry.index,
+            'duration': entry.duration
+        }

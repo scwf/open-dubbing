@@ -6,10 +6,13 @@ LLM驱动的字幕优化器（增强版）
 """
 
 import re
+import time
+import random
 from typing import List, Dict, Any, Optional, NamedTuple
 from pathlib import Path
 from ai_dubbing.src.logger import get_logger
 from openai import OpenAI
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class SRTEntry(NamedTuple):
@@ -27,7 +30,7 @@ class SRTEntry(NamedTuple):
 
 class SubtitleTimingConstants:
     """字幕时间计算常量"""
-    CHINESE_CHAR_TIME = 130  # 每个中文字符的默认朗读时间（毫秒）- 约0.13秒
+    CHINESE_CHAR_TIME = 150  # 每个中文字符的默认朗读时间（毫秒）- 约0.15秒
     ENGLISH_WORD_TIME = 250  # 每个英文单词的默认朗读时间（毫秒）- 约0.25秒
 
 
@@ -112,17 +115,25 @@ class TimeBorrowOptimizer:
         )
     
     def optimize_with_time_borrowing(self, entries: List[SRTEntry]) -> tuple[List[SRTEntry], List[Dict[str, Any]]]:
-        """使用时间借用优化字幕"""
+        """使用时间借用优化字幕（带空隙可借额度slack，避免双重借用同一空隙）"""
         if not entries:
             return entries, []
-        
-        optimized = []
-        decisions = []
-        
+
+        num_entries = len(entries)
+        optimized: List[SRTEntry] = []
+        decisions: List[Dict[str, Any]] = []
+
+        # 预计算每个相邻空隙及其可借额度 slack[i] 表示 entries[i] 与 entries[i+1] 之间可借的时间
+        slack: List[int] = []
+        for i in range(num_entries - 1):
+            gap = entries[i + 1].start_time - entries[i].end_time
+            available = max(0, gap - self.min_gap_threshold)
+            slack.append(available)
+
         for i, entry in enumerate(entries):
-            # 计算需要延长时间
+            # 计算需要延长的时间
             needed_time = self.calculate_needed_extension(entry.text, entry.duration)
-            
+
             if needed_time <= 0:
                 optimized.append(entry)
                 decisions.append({
@@ -132,25 +143,51 @@ class TimeBorrowOptimizer:
                     'time_added': 0
                 })
                 continue
-            
-            # 计算前后空隙
-            prev_gap = entry.start_time - (entries[i-1].end_time if i > 0 else 0)
-            next_gap = (entries[i+1].start_time if i < len(entries) - 1 else entry.end_time + 1) - entry.end_time
-            
-            # 尝试借用时间
-            can_borrow, front_borrow, back_borrow = self.can_borrow_time(prev_gap, next_gap)
-            total_borrowed = front_borrow + back_borrow
-            
+
+            # 读取两侧可借slack（不直接消费）
+            front_slack = slack[i - 1] if i > 0 else 0  # 当前与前一条之间
+            back_slack = slack[i] if i < num_entries - 1 else 0  # 当前与后一条之间
+
+            # 应用借用比例限制
+            front_cap = int(front_slack * self.borrow_ratio)
+            back_cap = int(back_slack * self.borrow_ratio)
+            total_cap = front_cap + back_cap
+
             total_needed = needed_time + self.extra_buffer
-            if total_borrowed >= total_needed:
-                # 时间借用成功，按比例分配借用时间
-                ratio = min(1.0, total_needed / total_borrowed)
-                actual_front = int(front_borrow * ratio)
-                actual_back = int(back_borrow * ratio)
-                
+            if total_cap >= total_needed and (front_cap > 0 or back_cap > 0):
+                # 按比例分配，再用余量补齐凑满 total_needed
+                ratio = min(1.0, total_needed / total_cap)
+                actual_front = int(front_cap * ratio)
+                actual_back = int(back_cap * ratio)
+
+                # 补齐由于取整导致的缺口
+                remainder = total_needed - (actual_front + actual_back)
+                if remainder > 0:
+                    # 先尝试从剩余容量较大的方向补齐
+                    front_room = front_cap - actual_front
+                    back_room = back_cap - actual_back
+                    add_front = min(remainder, max(0, front_room))
+                    actual_front += add_front
+                    remainder -= add_front
+                    if remainder > 0:
+                        add_back = min(remainder, max(0, back_room))
+                        actual_back += add_back
+                        remainder -= add_back
+
+                # 安全保护：不超过cap
+                actual_front = min(actual_front, front_cap)
+                actual_back = min(actual_back, back_cap)
+
+                # 更新当前条目的时间
                 adjusted_entry = self.adjust_timing(entry, actual_front, actual_back)
                 optimized.append(adjusted_entry)
-                
+
+                # 消耗对应空隙的slack，避免后续重复借用
+                if i > 0:
+                    slack[i - 1] = max(0, slack[i - 1] - actual_front)
+                if i < num_entries - 1:
+                    slack[i] = max(0, slack[i] - actual_back)
+
                 decisions.append({
                     'index': i,
                     'action': 'TIME_BORROW',
@@ -161,17 +198,17 @@ class TimeBorrowOptimizer:
                     'buffer_added': self.extra_buffer
                 })
             else:
-                # 时间借用不足，标记给LLM处理
+                # 时间借用不足，不消费slack，标记给LLM处理
                 optimized.append(entry)
                 decisions.append({
                     'index': i,
                     'action': 'NEED_LLM',
-                    'time_added': total_borrowed,
+                    'time_added': total_cap,
                     'reason': '时间借用不足，需要LLM优化',
                     'min_required': self._calculate_minimum_duration(entry.text),
                     'current_duration': entry.duration
                 })
-        
+
         return optimized, decisions
 
 
@@ -186,7 +223,10 @@ class LLMContextOptimizer:
                  english_word_min_time: int = None,
                  min_gap_threshold: int = 300,
                  borrow_ratio: float = 0.5,
-                 extra_buffer: int = 200):
+                 extra_buffer: int = 200,
+                 max_concurrency: int = 6,
+                 max_retries: int = 3,
+                 request_timeout: float = 60.0):
         """
         初始化LLM优化器（集成时间借用）
         
@@ -206,6 +246,11 @@ class LLMContextOptimizer:
         self.chinese_char_min_time = chinese_char_min_time or SubtitleTimingConstants.CHINESE_CHAR_TIME
         self.english_word_min_time = english_word_min_time or SubtitleTimingConstants.ENGLISH_WORD_TIME
         self.logger = get_logger()
+        self.max_concurrency = max(1, int(max_concurrency))
+        self.max_retries = max(0, int(max_retries))
+        self.request_timeout = float(request_timeout)
+        # 简单去重缓存：按（原文, 目标最小时长）作为key
+        self._simplify_cache: dict[tuple[str, int], Dict[str, Any]] = {}
         
         # 初始化时间借用优化器
         self.time_borrower = TimeBorrowOptimizer(
@@ -290,10 +335,8 @@ class LLMContextOptimizer:
                     'all_entries': time_optimized
                 })
             
-            # LLM文本简化
-            for context in llm_contexts:
-                llm_decision = self._get_llm_simplification(context)
-                llm_decisions.append(llm_decision)
+            # LLM文本简化（并行执行）
+            llm_decisions = self._parallel_llm_simplifications(llm_contexts)
             
             # 执行LLM简化
             llm_optimized = self._execute_simplifications(time_optimized, llm_decisions)
@@ -332,7 +375,7 @@ class LLMContextOptimizer:
         
         if short_duration_count > 0:
             self.logger.warning(f"⚠️ 仍有 {short_duration_count} 条字幕时长不足最小时长")
-            for detail in short_duration_details[:5]:  # 只显示前5条
+            for detail in short_duration_details:
                 self.logger.warning(
                     f"字幕{detail['index']}: 当前{detail['current_duration']}ms, "
                     f"需要{detail['min_required']}ms, 缺少{detail['shortage']}ms"
@@ -355,7 +398,7 @@ class LLMContextOptimizer:
         return llm_optimized, report
     
     def _get_llm_simplification(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """获取LLM文本简化结果（保持原有逻辑）"""
+        """获取LLM文本简化结果（可能抛出异常，由上层重试封装处理）"""
         if not self.client:
             return {'action': 'NO_CHANGE', 'reason': 'LLM未配置', 'original_text': context['current'].text}
         
@@ -409,36 +452,82 @@ class LLMContextOptimizer:
         REASON: [简要说明简化策略]
         """
         
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                stream=False
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            lines = result.split('\n')
-            simplified_text = context['current'].text
-            reason = 'LLM未返回有效简化文本'
-            
-            for line in lines:
-                if line.startswith('SIMPLIFIED_TEXT:'):
-                    simplified_text = line.split(':', 1)[1].strip().strip('"')
-                elif line.startswith('REASON:'):
-                    reason = line.split(':', 1)[1].strip()
-            
-            return {
-                'action': 'SIMPLIFY',
-                'reason': reason,
-                'original_text': context['current'].text,
-                'simplified_text': simplified_text,
-                'context': context
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            stream=False
+        )
+        
+        result = response.choices[0].message.content.strip()
+        
+        lines = result.split('\n')
+        simplified_text = context['current'].text
+        reason = 'LLM未返回有效简化文本'
+        
+        for line in lines:
+            if line.startswith('SIMPLIFIED_TEXT:'):
+                simplified_text = line.split(':', 1)[1].strip().strip('"')
+            elif line.startswith('REASON:'):
+                reason = line.split(':', 1)[1].strip()
+        
+        return {
+            'action': 'SIMPLIFY',
+            'reason': reason,
+            'original_text': context['current'].text,
+            'simplified_text': simplified_text,
+            'context': context
+        }
+
+    def _get_llm_simplification_with_retry(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """带重试与指数退避的LLM简化调用，并使用简单缓存去重"""
+        cache_key = (context['current'].text, context['min_required_duration'])
+        if cache_key in self._simplify_cache:
+            return self._simplify_cache[cache_key]
+
+        last_error: Optional[Exception] = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                decision = self._get_llm_simplification(context)
+                # 命中有效结果写入缓存
+                self._simplify_cache[cache_key] = decision
+                return decision
+            except Exception as exc:  # 捕获并退避重试
+                last_error = exc
+                if attempt < self.max_retries:
+                    backoff = min(2 ** attempt, 8) + random.uniform(0, 0.5)
+                    self.logger.warning(
+                        f"LLM请求失败，准备重试({attempt+1}/{self.max_retries})，{exc}，{backoff:.1f}s后重试"
+                    )
+                    time.sleep(backoff)
+                else:
+                    break
+
+        # 重试耗尽
+        self.logger.error(f"LLM请求重试耗尽: {last_error}")
+        return {'action': 'NO_CHANGE', 'reason': str(last_error) if last_error else 'unknown', 'context': context}
+
+    def _parallel_llm_simplifications(self, llm_contexts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """使用线程池并行执行LLM文本简化"""
+        decisions: List[Dict[str, Any]] = []
+        if not llm_contexts:
+            return decisions
+
+        self.logger.step(f"并行LLM简化：{len(llm_contexts)} 条，最大并发={self.max_concurrency}")
+        with ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
+            future_to_ctx = {
+                executor.submit(self._get_llm_simplification_with_retry, ctx): ctx
+                for ctx in llm_contexts
             }
-            
-        except Exception as e:
-            self.logger.error(f"LLM简化失败: {e}")
-            return {'action': 'NO_CHANGE', 'reason': str(e), 'original_text': context['current'].text}
+            for future in as_completed(future_to_ctx):
+                context = future_to_ctx[future]
+                try:
+                    decision = future.result()
+                except Exception as exc:
+                    self.logger.error(f"并行简化异常（idx={context.get('index')}）: {exc}")
+                    decision = {'action': 'NO_CHANGE', 'reason': str(exc), 'context': context}
+                decisions.append(decision)
+
+        return decisions
     
     def _execute_simplifications(self, entries: List[SRTEntry], decisions: List[Dict[str, Any]]) -> List[SRTEntry]:
         """执行LLM文本简化决策"""

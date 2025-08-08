@@ -31,6 +31,11 @@ strategy = basic
 # 语言设置：zh, en, ja, ko（TXT模式专用）
 language = zh
 
+[并发配置]
+# 策略并行合成：最大并发、最大重试
+tts_max_concurrency = 8
+tts_max_retries = 2
+
 [字幕优化配置]
 llm_api_key = sk-xxxxxxxxxxxxxxxxxx
 llm_model = deepseek-chat
@@ -38,6 +43,14 @@ base_url = https://api.deepseek.com
 #单位毫秒
 chinese_char_min_time = 130
 english_word_min_time = 250
+
+# LLM并发与稳定性配置
+# 最大并发请求数（根据供应商限流适当调整）
+llm_max_concurrency = 6
+# 失败重试次数（指数退避）
+llm_max_retries = 3
+# 单请求超时（秒）
+llm_timeout = 60
 
 # 优化后的SRT文件输出路径（可选，默认在输入文件同目录）
 optimized_srt_output_file = /home/xiaofei/code/open-dubbing/input/sample3_optimized.srt

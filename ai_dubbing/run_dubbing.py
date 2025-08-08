@@ -120,6 +120,9 @@ def main():
     tts_engine_name = get_config_value(config, '基本配置', 'tts_engine', 'index_tts')
     strategy_name = get_config_value(config, '基本配置', 'strategy', 'stretch')
     lang = get_config_value(config, '高级配置', 'language', 'zh')
+    # 并发配置（供策略并行合成使用）
+    tts_max_concurrency = get_config_value(config, '并发配置', 'tts_max_concurrency', 8, int)
+    tts_max_retries = get_config_value(config, '并发配置', 'tts_max_retries', 2, int)
     
     # 解析多对参考音频配置
     voice_files, prompt_texts = get_multi_voice_config(config)
@@ -204,6 +207,9 @@ def main():
             "ref_text": prompt_texts[0] if prompt_texts else None,     # 兼容性
             "voice_files": voice_files,        # 所有参考音频文件
             "prompt_texts": prompt_texts,      # 所有参考文本
+            # 并发相关参数：由基础策略读取并控制
+            "max_concurrency": tts_max_concurrency,
+            "max_retries": tts_max_retries,
         }
         
         audio_segments = strategy_instance.process_entries(
