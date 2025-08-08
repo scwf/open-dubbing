@@ -30,7 +30,7 @@ class SRTEntry(NamedTuple):
 
 class SubtitleTimingConstants:
     """字幕时间计算常量"""
-    CHINESE_CHAR_TIME = 130  # 每个中文字符的默认朗读时间（毫秒）- 约0.13秒
+    CHINESE_CHAR_TIME = 150  # 每个中文字符的默认朗读时间（毫秒）- 约0.15秒
     ENGLISH_WORD_TIME = 250  # 每个英文单词的默认朗读时间（毫秒）- 约0.25秒
 
 
