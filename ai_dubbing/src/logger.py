@@ -112,6 +112,12 @@ class SRTDubbingLogger:
         formatted = self._format_message("ERROR", message)
         self.logger.error(formatted)
     
+    def exception(self, message: str) -> None:
+        """异常日志（包含堆栈信息）"""
+        formatted = self._format_message("ERROR", message)
+        # 使用 logging.exception 自动携带当前异常堆栈
+        self.logger.exception(formatted)
+    
     def debug(self, message: str) -> None:
         """调试日志"""
         formatted = self._format_message("DEBUG", message)

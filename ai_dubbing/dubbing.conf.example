@@ -5,7 +5,7 @@
 # 输入文件路径（SRT或TXT，必须指定）
 input_file = /path/to/input.srt
 
-# 参考语音文件路径（WAV格式，支持多个，用逗号分隔）
+# 参考语音文件路径（支持 wav/mp3，支持多个，用逗号分隔）
 # 单个文件示例：
 # voice_files = /path/to/reference.wav
 # 多个文件示例：
@@ -40,7 +40,7 @@ chinese_char_min_time = 130
 english_word_min_time = 250
 
 # 优化后的SRT文件输出路径（可选，默认在输入文件同目录）
-output_file = /home/xiaofei/code/open-dubbing/input/sample3_optimized.srt
+optimized_srt_output_file = /home/xiaofei/code/open-dubbing/input/sample3_optimized.srt
 
 [时间借用配置]
 # 最小保护空隙（毫秒），小于此值的空隙不借用

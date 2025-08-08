@@ -72,7 +72,7 @@ class StrategyConfig:
     BASIC_MIN_SPEED_RATIO = 0.8
     
     # 调试功能开关
-    ENABLE_SAVE_ENTRY_WAVFILE = True  # 是否保存各个字幕条目的音频文件到临时目录
+    ENABLE_SAVE_ENTRY_WAVFILE = False  # 是否保存各个字幕条目的音频文件到临时目录
 
 
 class IndexTTSConfig:

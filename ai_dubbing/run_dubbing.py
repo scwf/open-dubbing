@@ -117,8 +117,8 @@ def main():
     # 解析配置参数（映射到cli.py的参数）
     input_file = get_config_value(config, '基本配置', 'input_file')
     output_file = get_config_value(config, '基本配置', 'output_file', PATH.get_default_output_path())
-    tts_engine = get_config_value(config, '基本配置', 'tts_engine', 'index_tts')
-    strategy = get_config_value(config, '基本配置', 'strategy', 'stretch')
+    tts_engine_name = get_config_value(config, '基本配置', 'tts_engine', 'index_tts')
+    strategy_name = get_config_value(config, '基本配置', 'strategy', 'stretch')
     lang = get_config_value(config, '高级配置', 'language', 'zh')
     
     # 解析多对参考音频配置
@@ -145,20 +145,25 @@ def main():
         logger.error(f"输入文件不存在: {input_file}")
         return 1
     
+    allowed_exts = {'.wav', '.mp3'}
     for i, voice_file in enumerate(voice_files):
         if not os.path.exists(voice_file):
             logger.error(f"参考语音文件不存在: {voice_file}")
             return 1
+        ext = Path(voice_file).suffix.lower()
+        if ext not in allowed_exts:
+            logger.error(f"参考语音文件格式不支持: {voice_file}，仅支持 wav/mp3")
+            return 1
     
-    process_logger.start(f"输入: {input_file}, 引擎: {tts_engine}, 策略: {strategy}, 参考音频: {len(voice_files)}个")
+    process_logger.start(f"输入: {input_file}, 引擎: {tts_engine_name}, 策略: {strategy_name}, 参考音频: {len(voice_files)}个")
 
     # --- 1. 初始化TTS引擎 ---
     try:
         process_logger.step("初始化TTS引擎")
-        tts_engine_instance = get_tts_engine(tts_engine)
-        process_logger.logger.info(f"使用TTS引擎: {tts_engine}")
-    except (ValueError, RuntimeError, ImportError) as e:
-        process_logger.logger.error(f"TTS引擎初始化失败: {e}")
+        tts_engine_instance = get_tts_engine(tts_engine_name)
+        process_logger.logger.info(f"使用TTS引擎: {tts_engine_name}")
+    except (ValueError, RuntimeError, ImportError):
+        process_logger.logger.exception("TTS引擎初始化失败")
         return 1
         
     # --- 2. 解析文件 ---
@@ -172,24 +177,21 @@ def main():
         
         entries = parser_instance.parse_file(input_file)
         process_logger.logger.success(f"成功解析 {len(entries)} 个条目")
-    except Exception as e:
-        process_logger.logger.error(f"解析文件失败: {e}", e)
+    except Exception:
+        process_logger.logger.exception("解析文件失败")
         return 1
 
     # --- 3. 初始化处理策略 ---
-    strategy_name = strategy
-    if is_txt_mode:
-        if strategy_name != "basic":
-            process_logger.logger.warning(f"TXT文件模式下仅支持 'basic' 策略，已自动切换。")
-            strategy_name = "basic"
-            
+    if is_txt_mode and strategy_name != "basic":
+        process_logger.logger.warning("TXT文件模式下仅支持 'basic' 策略，已自动切换。")
+        strategy_name = "basic"
     try:
         process_logger.step("初始化处理策略")
         # 注入TTS引擎实例
-        strategy = get_strategy(strategy_name, tts_engine=tts_engine_instance)
-        process_logger.logger.info(f"使用策略: {strategy.name()} - {strategy.description()}")
-    except ValueError as e:
-        process_logger.logger.error(f"策略初始化失败: {e}")
+        strategy_instance = get_strategy(strategy_name, tts_engine=tts_engine_instance)
+        process_logger.logger.info(f"使用策略: {strategy_instance.name()} - {strategy_instance.description()}")
+    except ValueError:
+        process_logger.logger.exception("策略初始化失败")
         return 1
 
     # --- 4. 生成音频片段 ---
@@ -204,14 +206,14 @@ def main():
             "prompt_texts": prompt_texts,      # 所有参考文本
         }
         
-        audio_segments = strategy.process_entries(
+        audio_segments = strategy_instance.process_entries(
             entries,
             voice_reference=voice_files[0],  # 主要参考音频
             **runtime_kwargs
         )
         process_logger.logger.success(f"成功生成 {len(audio_segments)} 个音频片段")
-    except Exception as e:
-        process_logger.logger.error(f"音频生成失败: {e}")
+    except Exception:
+        process_logger.logger.exception("音频生成失败")
         return 1
         
     # --- 5. 合并并导出音频 ---
@@ -227,11 +229,8 @@ def main():
             process_logger.logger.error("音频导出失败")
             return 1
             
-    except Exception as e:
-        process_logger.logger.error(f"音频处理失败: {e}")
-        import traceback
-        process_logger.logger.debug("详细错误信息:")
-        process_logger.logger.debug(traceback.format_exc())
+    except Exception:
+        process_logger.logger.exception("音频处理失败")
         return 1
     
     end_time = time.time()
