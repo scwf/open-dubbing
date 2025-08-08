@@ -115,17 +115,25 @@ class TimeBorrowOptimizer:
         )
     
     def optimize_with_time_borrowing(self, entries: List[SRTEntry]) -> tuple[List[SRTEntry], List[Dict[str, Any]]]:
-        """使用时间借用优化字幕"""
+        """使用时间借用优化字幕（带空隙可借额度slack，避免双重借用同一空隙）"""
         if not entries:
             return entries, []
-        
-        optimized = []
-        decisions = []
-        
+
+        num_entries = len(entries)
+        optimized: List[SRTEntry] = []
+        decisions: List[Dict[str, Any]] = []
+
+        # 预计算每个相邻空隙及其可借额度 slack[i] 表示 entries[i] 与 entries[i+1] 之间可借的时间
+        slack: List[int] = []
+        for i in range(num_entries - 1):
+            gap = entries[i + 1].start_time - entries[i].end_time
+            available = max(0, gap - self.min_gap_threshold)
+            slack.append(available)
+
         for i, entry in enumerate(entries):
-            # 计算需要延长时间
+            # 计算需要延长的时间
             needed_time = self.calculate_needed_extension(entry.text, entry.duration)
-            
+
             if needed_time <= 0:
                 optimized.append(entry)
                 decisions.append({
@@ -135,25 +143,51 @@ class TimeBorrowOptimizer:
                     'time_added': 0
                 })
                 continue
-            
-            # 计算前后空隙
-            prev_gap = entry.start_time - (entries[i-1].end_time if i > 0 else 0)
-            next_gap = (entries[i+1].start_time if i < len(entries) - 1 else entry.end_time + 1) - entry.end_time
-            
-            # 尝试借用时间
-            can_borrow, front_borrow, back_borrow = self.can_borrow_time(prev_gap, next_gap)
-            total_borrowed = front_borrow + back_borrow
-            
+
+            # 读取两侧可借slack（不直接消费）
+            front_slack = slack[i - 1] if i > 0 else 0  # 当前与前一条之间
+            back_slack = slack[i] if i < num_entries - 1 else 0  # 当前与后一条之间
+
+            # 应用借用比例限制
+            front_cap = int(front_slack * self.borrow_ratio)
+            back_cap = int(back_slack * self.borrow_ratio)
+            total_cap = front_cap + back_cap
+
             total_needed = needed_time + self.extra_buffer
-            if total_borrowed >= total_needed:
-                # 时间借用成功，按比例分配借用时间
-                ratio = min(1.0, total_needed / total_borrowed)
-                actual_front = int(front_borrow * ratio)
-                actual_back = int(back_borrow * ratio)
-                
+            if total_cap >= total_needed and (front_cap > 0 or back_cap > 0):
+                # 按比例分配，再用余量补齐凑满 total_needed
+                ratio = min(1.0, total_needed / total_cap)
+                actual_front = int(front_cap * ratio)
+                actual_back = int(back_cap * ratio)
+
+                # 补齐由于取整导致的缺口
+                remainder = total_needed - (actual_front + actual_back)
+                if remainder > 0:
+                    # 先尝试从剩余容量较大的方向补齐
+                    front_room = front_cap - actual_front
+                    back_room = back_cap - actual_back
+                    add_front = min(remainder, max(0, front_room))
+                    actual_front += add_front
+                    remainder -= add_front
+                    if remainder > 0:
+                        add_back = min(remainder, max(0, back_room))
+                        actual_back += add_back
+                        remainder -= add_back
+
+                # 安全保护：不超过cap
+                actual_front = min(actual_front, front_cap)
+                actual_back = min(actual_back, back_cap)
+
+                # 更新当前条目的时间
                 adjusted_entry = self.adjust_timing(entry, actual_front, actual_back)
                 optimized.append(adjusted_entry)
-                
+
+                # 消耗对应空隙的slack，避免后续重复借用
+                if i > 0:
+                    slack[i - 1] = max(0, slack[i - 1] - actual_front)
+                if i < num_entries - 1:
+                    slack[i] = max(0, slack[i] - actual_back)
+
                 decisions.append({
                     'index': i,
                     'action': 'TIME_BORROW',
@@ -164,17 +198,17 @@ class TimeBorrowOptimizer:
                     'buffer_added': self.extra_buffer
                 })
             else:
-                # 时间借用不足，标记给LLM处理
+                # 时间借用不足，不消费slack，标记给LLM处理
                 optimized.append(entry)
                 decisions.append({
                     'index': i,
                     'action': 'NEED_LLM',
-                    'time_added': total_borrowed,
+                    'time_added': total_cap,
                     'reason': '时间借用不足，需要LLM优化',
                     'min_required': self._calculate_minimum_duration(entry.text),
                     'current_duration': entry.duration
                 })
-        
+
         return optimized, decisions
 
 
