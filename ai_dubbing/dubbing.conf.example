@@ -31,6 +31,11 @@ strategy = basic
 # 语言设置：zh, en, ja, ko（TXT模式专用）
 language = zh
 
+[并发配置]
+# 策略并行合成：最大并发、最大重试
+tts_max_concurrency = 8
+tts_max_retries = 2
+
 [字幕优化配置]
 llm_api_key = sk-xxxxxxxxxxxxxxxxxx
 llm_model = deepseek-chat
