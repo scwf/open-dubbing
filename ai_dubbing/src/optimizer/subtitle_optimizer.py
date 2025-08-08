@@ -198,16 +198,58 @@ class TimeBorrowOptimizer:
                     'buffer_added': self.extra_buffer
                 })
             else:
-                # 时间借用不足，不消费slack，标记给LLM处理
-                optimized.append(entry)
-                decisions.append({
-                    'index': i,
-                    'action': 'NEED_LLM',
-                    'time_added': total_cap,
-                    'reason': '时间借用不足，需要LLM优化',
-                    'min_required': self._calculate_minimum_duration(entry.text),
-                    'current_duration': entry.duration
-                })
+                # total_cap 不足以覆盖 total_needed 的情况
+                if (front_cap > 0 or back_cap > 0) and total_cap > 0:
+                    # 部分借用：把能借的都借走
+                    actual_front = front_cap
+                    actual_back = back_cap
+
+                    adjusted_entry = self.adjust_timing(entry, actual_front, actual_back)
+                    optimized.append(adjusted_entry)
+
+                    # 消耗对应空隙的slack
+                    if i > 0:
+                        slack[i - 1] = max(0, slack[i - 1] - actual_front)
+                    if i < num_entries - 1:
+                        slack[i] = max(0, slack[i] - actual_back)
+
+                    # 记录部分借用决策（沿用 TIME_BORROW，增加 partial 标记）
+                    added = actual_front + actual_back
+                    min_required_now = self._calculate_minimum_duration(entry.text)
+                    decisions.append({
+                        'index': i,
+                        'action': 'TIME_BORROW',
+                        'partial': True,
+                        'time_added': added,
+                        'front_borrow': actual_front,
+                        'back_borrow': actual_back,
+                        'reason': '可借不足，已尽量借用',
+                        'buffer_requested': self.extra_buffer,
+                        'buffer_fulfilled': max(0, added - needed_time),
+                        'short_of_total_needed': max(0, total_needed - added)
+                    })
+
+                    # 若部分借用后仍低于最小时长，则追加LLM优化标记
+                    if adjusted_entry.duration < min_required_now:
+                        decisions.append({
+                            'index': i,
+                            'action': 'NEED_LLM',
+                            'time_added': added,
+                            'reason': '部分借用后仍不足最小时长，需要LLM优化',
+                            'min_required': min_required_now,
+                            'current_duration': adjusted_entry.duration
+                        })
+                else:
+                    # 完全无法借用：标记给LLM处理
+                    optimized.append(entry)
+                    decisions.append({
+                        'index': i,
+                        'action': 'NEED_LLM',
+                        'time_added': total_cap,
+                        'reason': '时间借用不足，需要LLM优化',
+                        'min_required': self._calculate_minimum_duration(entry.text),
+                        'current_duration': entry.duration
+                    })
 
         return optimized, decisions
 
@@ -323,7 +365,14 @@ class LLMContextOptimizer:
             # 创建需要LLM优化的上下文
             llm_contexts = []
             for idx in need_llm_indices:
-                decision = next(d for d in time_decisions if d['index'] == idx)
+                # 因为存在部分时间借用的情况，选取该索引对应的 NEED_LLM 决策，而不是同索引的其他类型决策
+                decision = next((d for d in time_decisions if d['index'] == idx and d['action'] == 'NEED_LLM'), None)
+                if decision is None:
+                    # 这里应该日志报错：未能找到对应的 NEED_LLM 决策
+                    candidates = [d for d in time_decisions if d['index'] == idx]
+                    self.logger.error(f"未找到NEED_LLM决策（idx={idx}）。候选决策actions={ [c.get('action') for c in candidates] }")
+                    continue
+
                 entry = time_optimized[idx]
                 
                 llm_contexts.append({
