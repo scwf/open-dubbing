@@ -66,7 +66,7 @@ def load_config_from_file(config_file=None):
         # 新增并发与重试配置（可选，提供默认）
         'llm_max_concurrency': get_config_value(config, '字幕优化配置', 'llm_max_concurrency', 6, int),
         'llm_max_retries': get_config_value(config, '字幕优化配置', 'llm_max_retries', 3, int),
-        'llm_timeout': get_config_value(config, '字幕优化配置', 'llm_timeout', 30, int),
+        'llm_timeout': get_config_value(config, '字幕优化配置', 'llm_timeout', 60, int),
         'min_gap_threshold': get_config_value(config, '时间借用配置', 'min_gap_threshold', 300, int),
         'borrow_ratio': get_config_value(config, '时间借用配置', 'borrow_ratio', 0.5, float),
         'extra_buffer': get_config_value(config, '时间借用配置', 'extra_buffer', 200, int)

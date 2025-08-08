@@ -192,7 +192,7 @@ class LLMContextOptimizer:
                  extra_buffer: int = 200,
                  max_concurrency: int = 6,
                  max_retries: int = 3,
-                 request_timeout: float = 30.0):
+                 request_timeout: float = 60.0):
         """
         初始化LLM优化器（集成时间借用）
         
@@ -341,7 +341,7 @@ class LLMContextOptimizer:
         
         if short_duration_count > 0:
             self.logger.warning(f"⚠️ 仍有 {short_duration_count} 条字幕时长不足最小时长")
-            for detail in short_duration_details[:5]:  # 只显示前5条
+            for detail in short_duration_details:
                 self.logger.warning(
                     f"字幕{detail['index']}: 当前{detail['current_duration']}ms, "
                     f"需要{detail['min_required']}ms, 缺少{detail['shortage']}ms"
