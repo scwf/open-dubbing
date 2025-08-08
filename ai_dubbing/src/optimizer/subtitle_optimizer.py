@@ -6,10 +6,13 @@ LLM驱动的字幕优化器（增强版）
 """
 
 import re
+import time
+import random
 from typing import List, Dict, Any, Optional, NamedTuple
 from pathlib import Path
 from ai_dubbing.src.logger import get_logger
 from openai import OpenAI
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class SRTEntry(NamedTuple):
@@ -186,7 +189,10 @@ class LLMContextOptimizer:
                  english_word_min_time: int = None,
                  min_gap_threshold: int = 300,
                  borrow_ratio: float = 0.5,
-                 extra_buffer: int = 200):
+                 extra_buffer: int = 200,
+                 max_concurrency: int = 6,
+                 max_retries: int = 3,
+                 request_timeout: float = 30.0):
         """
         初始化LLM优化器（集成时间借用）
         
@@ -206,6 +212,11 @@ class LLMContextOptimizer:
         self.chinese_char_min_time = chinese_char_min_time or SubtitleTimingConstants.CHINESE_CHAR_TIME
         self.english_word_min_time = english_word_min_time or SubtitleTimingConstants.ENGLISH_WORD_TIME
         self.logger = get_logger()
+        self.max_concurrency = max(1, int(max_concurrency))
+        self.max_retries = max(0, int(max_retries))
+        self.request_timeout = float(request_timeout)
+        # 简单去重缓存：按（原文, 目标最小时长）作为key
+        self._simplify_cache: dict[tuple[str, int], Dict[str, Any]] = {}
         
         # 初始化时间借用优化器
         self.time_borrower = TimeBorrowOptimizer(
@@ -290,10 +301,8 @@ class LLMContextOptimizer:
                     'all_entries': time_optimized
                 })
             
-            # LLM文本简化
-            for context in llm_contexts:
-                llm_decision = self._get_llm_simplification(context)
-                llm_decisions.append(llm_decision)
+            # LLM文本简化（并行执行）
+            llm_decisions = self._parallel_llm_simplifications(llm_contexts)
             
             # 执行LLM简化
             llm_optimized = self._execute_simplifications(time_optimized, llm_decisions)
@@ -355,7 +364,7 @@ class LLMContextOptimizer:
         return llm_optimized, report
     
     def _get_llm_simplification(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """获取LLM文本简化结果（保持原有逻辑）"""
+        """获取LLM文本简化结果（可能抛出异常，由上层重试封装处理）"""
         if not self.client:
             return {'action': 'NO_CHANGE', 'reason': 'LLM未配置', 'original_text': context['current'].text}
         
@@ -409,36 +418,82 @@ class LLMContextOptimizer:
         REASON: [简要说明简化策略]
         """
         
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                stream=False
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            lines = result.split('\n')
-            simplified_text = context['current'].text
-            reason = 'LLM未返回有效简化文本'
-            
-            for line in lines:
-                if line.startswith('SIMPLIFIED_TEXT:'):
-                    simplified_text = line.split(':', 1)[1].strip().strip('"')
-                elif line.startswith('REASON:'):
-                    reason = line.split(':', 1)[1].strip()
-            
-            return {
-                'action': 'SIMPLIFY',
-                'reason': reason,
-                'original_text': context['current'].text,
-                'simplified_text': simplified_text,
-                'context': context
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            stream=False
+        )
+        
+        result = response.choices[0].message.content.strip()
+        
+        lines = result.split('\n')
+        simplified_text = context['current'].text
+        reason = 'LLM未返回有效简化文本'
+        
+        for line in lines:
+            if line.startswith('SIMPLIFIED_TEXT:'):
+                simplified_text = line.split(':', 1)[1].strip().strip('"')
+            elif line.startswith('REASON:'):
+                reason = line.split(':', 1)[1].strip()
+        
+        return {
+            'action': 'SIMPLIFY',
+            'reason': reason,
+            'original_text': context['current'].text,
+            'simplified_text': simplified_text,
+            'context': context
+        }
+
+    def _get_llm_simplification_with_retry(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """带重试与指数退避的LLM简化调用，并使用简单缓存去重"""
+        cache_key = (context['current'].text, context['min_required_duration'])
+        if cache_key in self._simplify_cache:
+            return self._simplify_cache[cache_key]
+
+        last_error: Optional[Exception] = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                decision = self._get_llm_simplification(context)
+                # 命中有效结果写入缓存
+                self._simplify_cache[cache_key] = decision
+                return decision
+            except Exception as exc:  # 捕获并退避重试
+                last_error = exc
+                if attempt < self.max_retries:
+                    backoff = min(2 ** attempt, 8) + random.uniform(0, 0.5)
+                    self.logger.warning(
+                        f"LLM请求失败，准备重试({attempt+1}/{self.max_retries})，{exc}，{backoff:.1f}s后重试"
+                    )
+                    time.sleep(backoff)
+                else:
+                    break
+
+        # 重试耗尽
+        self.logger.error(f"LLM请求重试耗尽: {last_error}")
+        return {'action': 'NO_CHANGE', 'reason': str(last_error) if last_error else 'unknown', 'context': context}
+
+    def _parallel_llm_simplifications(self, llm_contexts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """使用线程池并行执行LLM文本简化"""
+        decisions: List[Dict[str, Any]] = []
+        if not llm_contexts:
+            return decisions
+
+        self.logger.step(f"并行LLM简化：{len(llm_contexts)} 条，最大并发={self.max_concurrency}")
+        with ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
+            future_to_ctx = {
+                executor.submit(self._get_llm_simplification_with_retry, ctx): ctx
+                for ctx in llm_contexts
             }
-            
-        except Exception as e:
-            self.logger.error(f"LLM简化失败: {e}")
-            return {'action': 'NO_CHANGE', 'reason': str(e), 'original_text': context['current'].text}
+            for future in as_completed(future_to_ctx):
+                context = future_to_ctx[future]
+                try:
+                    decision = future.result()
+                except Exception as exc:
+                    self.logger.error(f"并行简化异常（idx={context.get('index')}）: {exc}")
+                    decision = {'action': 'NO_CHANGE', 'reason': str(exc), 'context': context}
+                decisions.append(decision)
+
+        return decisions
     
     def _execute_simplifications(self, entries: List[SRTEntry], decisions: List[Dict[str, Any]]) -> List[SRTEntry]:
         """执行LLM文本简化决策"""
