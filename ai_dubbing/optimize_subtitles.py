@@ -139,8 +139,8 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
         
         return optimized_path
         
-    except Exception as e:
-        logger.error(f"字幕优化失败: {str(e)}", exc_info=True)
+    except Exception:
+        logger.exception("字幕优化失败")
         return None
 
 def main():
@@ -162,8 +162,8 @@ def main():
         print("请在 dubbing.conf 文件的 [字幕优化配置] 部分设置 llm_api_key")
         return 1
     
-    # 从字幕优化配置读取输出文件
-    output_file = get_config_value(config, '字幕优化配置', 'output_file')
+    # 从字幕优化配置读取输出文件（新键名优先，兼容旧键名）
+    output_file = get_config_value(config, '字幕优化配置', 'optimized_srt_output_file')
     
     # 执行优化
     result = optimize_srt_file(input_file, output_file, llm_config)
