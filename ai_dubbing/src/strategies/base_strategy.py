@@ -73,6 +73,7 @@ class TimeSyncStrategy(ABC):
         results: List[Dict[str, Any]] = [None] * len(entries)
         completed = 0
         process_logger.progress(0, len(entries), "开始并行合成")
+        start_ts = time.time()
         with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
             future_to_idx = {executor.submit(call_with_retry, i, entry): i for i, entry in enumerate(entries)}
             for future in as_completed(future_to_idx):
@@ -89,5 +90,6 @@ class TimeSyncStrategy(ABC):
                     if len(entry.text) > LOG.PROGRESS_TEXT_PREVIEW_LENGTH else entry.text
                 process_logger.progress(completed, len(entries), f"条目 {entry.index}: {text_preview}")
 
-        process_logger.complete(f"生成 {len(results)} 个音频片段")
+        elapsed = time.time() - start_ts
+        process_logger.complete(f"生成 {len(results)} 个音频片段（耗时 {elapsed:.2f}s）")
         return results
