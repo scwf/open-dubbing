@@ -1,8 +1,12 @@
-ffmpeg-python
-librosa 
-numpy
-soundfile
+# 项目通用Python依赖（不包含各TTS引擎与PyTorch）
+# 各TTS引擎请按 INSTALL.md 分节单独安装；PyTorch 请按CUDA版本选择官方源安装
+
 colorama
-tqdm 
+ffmpeg-python
+librosa
+numpy
+openai
 pysbd
 python-dotenv
+soundfile
+tqdm
