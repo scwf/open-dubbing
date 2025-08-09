@@ -36,7 +36,7 @@ def main():
     input_group.add_argument("--srt", help="待处理的SRT字幕文件路径")
     input_group.add_argument("--txt", help="待处理的TXT纯文本文件路径")
 
-    parser.add_argument("--voice", required=True, help="参考语音WAV文件路径")
+    parser.add_argument("--voice", required=True, help="参考语音文件路径（wav/mp3）")
     parser.add_argument("--output", default=PATH.get_default_output_path(), help=f"输出的音频文件路径 (默认: {PATH.get_default_output_path()})")
     
     # --- 策略与引擎选择 ---
@@ -61,9 +61,15 @@ def main():
 
     # --- 模型与配置 ---
     parser.add_argument("--lang", default="zh", help="[TXT模式] 指定文本语言 (例如: en, zh)")
-    parser.add_argument("--prompt-text", help="[CosyVoice] 参考音频对应的文本")
+    parser.add_argument(
+        "--prompt-text",
+        help="参考音频对应的文本（CosyVoice/Fish Speech/F5-TTS 等引擎建议统一使用该参数）"
+    )
 
-    parser.add_argument("--ref-text", help="[F5TTS] 参考音频对应的文本")
+    parser.add_argument(
+        "--ref-text",
+        help="[兼容参数] F5-TTS 引擎专用参考文本；如与 --prompt-text 同时提供，则优先使用 --ref-text"
+    )
     
     # --- 其他选项 ---
     
@@ -126,9 +132,11 @@ def main():
         process_logger.step("生成音频片段")
         
         # 将引擎特定的运行时参数传递给策略
+        # 统一使用 --prompt-text；如提供 --ref-text，则在 F5-TTS 等需要 ref_text 的引擎中优先生效
+        effective_ref_text = args.ref_text if args.ref_text else args.prompt_text
         runtime_kwargs = {
             "prompt_text": args.prompt_text,
-            "ref_text": args.prompt_text
+            "ref_text": effective_ref_text
         }
         
         audio_segments = strategy.process_entries(

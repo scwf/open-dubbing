@@ -19,7 +19,9 @@ ai_dubbing/
 ├── src/
 │   ├── __init__.py            # 模块初始化
 │   ├── config.py              # 配置管理
-│   ├── utils.py               # 工具函数
+│   ├── utils/                 # 工具包
+│   │   ├── __init__.py
+│   │   └── common_utils.py
 │   ├── logger.py              # 日志系统
 │   ├── audio_processor.py     # 音频处理器
 │   ├── cli.py                 # 命令行接口
@@ -70,11 +72,11 @@ cp ai_dubbing/dubbing.conf.example ai_dubbing/dubbing.conf
 # 输入文件路径（SRT或TXT，必须指定）
 input_file = subtitles/movie.srt
 
-# 参考语音文件路径（WAV格式，必须指定）
-voice_file = voices/narrator.wav
+# 参考语音文件路径（支持 wav/mp3，多条用逗号分隔）
+voice_files = voices/ref1.wav, voices/ref2.mp3
 
-# 参考音频文本（使用fish_speech/cosy_voice/f5_tts时需要）
-prompt_text = "这是参考音频讲的语音对应的文字"
+# 参考音频对应文本（与 voice_files 一一对应，文本使用双引号包裹）
+prompt_texts = "这是第一段参考音频文本", "这是第二段参考音频文本"
 
 # 输出音频文件路径（默认：output.wav）
 output_file = output/movie_dubbed.wav
@@ -84,7 +86,7 @@ tts_engine = fish_speech
 
 # 时间同步策略：stretch, basic
 # 注意：TXT文件模式下系统会自动使用basic策略
-strategy = basic
+strategy = stretch
 
 [高级配置]
 # 语言设置：zh, en, ja, ko（TXT模式专用）
@@ -105,30 +107,30 @@ python ai_dubbing/run_dubbing.py
 python -m ai_dubbing.src.cli \
   --srt input.srt \
   --voice reference.wav \
-  --output result.wav
+  --output result.wav \
+  --prompt-text "这是参考音频说的话。"
 ```
 
 #### 完整示例
 
 ```bash
-# 使用时间拉伸策略，精确匹配字幕时长 (使用默认的index_tts引擎)
+# 使用时间拉伸策略，精确匹配字幕时长（使用默认的 index_tts 引擎）
 python -m ai_dubbing.src.cli \
   --srt subtitles/movie.srt \
   --voice voices/narrator.wav \
   --output output/movie_dubbed.wav \
   --strategy stretch \
-  --model-dir model-dir/index_tts
+  --prompt-text "这是参考音频说的话。"
 
-# 使用CosyVoice引擎 (需要提供参考文本)
+# 使用CosyVoice引擎（需要提供参考文本）
 python -m ai_dubbing.src.cli \
   --srt subtitles/movie.srt \
   --voice voices/speaker.wav \
   --output output/movie_cosy.wav \
   --tts-engine cosy_voice \
-  --prompt-text "这是参考音频说的话。" \
-  --fp16
+  --prompt-text "这是参考音频说的话。"
 
-# 使用Fish Speech引擎 (需要提供参考文本)
+# 使用Fish Speech引擎（需要提供参考文本）
 python -m ai_dubbing.src.cli \
   --srt subtitles/movie.srt \
   --voice voices/speaker.wav \
@@ -151,7 +153,7 @@ python -m ai_dubbing.src.cli \
 | 参数 | 说明 | 示例 |
 |------|------|------|
 | `--srt` | SRT字幕文件路径 | `--srt input.srt` |
-| `--voice` | 参考语音文件路径（WAV格式） | `--voice reference.wav` |
+| `--voice` | 参考语音文件路径（wav/mp3） | `--voice reference.wav` |
 | `--output`| 输出音频文件路径 | `--output result.wav` |
 
 ### 策略与引擎
@@ -165,10 +167,17 @@ python -m ai_dubbing.src.cli \
 
 | 参数 | 默认值 | 说明 | 示例 |
 |------|--------|------|------|
-| `--model-dir` | `model-dir/index_tts` | TTS模型目录 | `--model-dir /path/to/model` |
-| `--cfg-path` | 自动检测 | 模型配置文件路径 | `--cfg-path config.yaml` |
-| `--prompt-text`| 无 | [CosyVoice/Fish Speech] 参考音频对应的文本，使用 `cosy_voice` 或 `fish_speech` 引擎时必需 | `--prompt-text "你好世界"` |
-| `--fp16` | 关闭 | [CosyVoice/IndexTTS] 启用FP16半精度推理以加速 | `--fp16` |
+| `--prompt-text`| 无 | 参考音频对应的文本（部分引擎必需，统一用此参数） | `--prompt-text "你好世界"` |
+
+### 仅优化字幕（不合成音频）
+
+```bash
+python ai_dubbing/run_optimize_subtitles.py
+```
+
+- 从 `ai_dubbing/dubbing.conf` 读取“字幕优化配置”和“时间借用配置”。
+- 输出 `optimized_srt_output_file` 指定的路径；未配置则默认写入同目录的 `*_llm_optimized.srt`。
+- 时间借用已支持“部分借用”：即使总可借时长小于需求+缓冲，也会尽量借用可用时长。
 
 ### 其他
 
