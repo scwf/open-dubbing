@@ -101,7 +101,7 @@ python ai_dubbing/run_dubbing.py
 ### 方式二：CLI命令行参数
 
 #### 基础使用
-默认使用 `index_tts` 引擎和 `stretch` 策略：
+默认使用 `fish_speech` 引擎和 `stretch` 策略：
 
 ```bash
 python -m ai_dubbing.src.cli \
@@ -114,7 +114,7 @@ python -m ai_dubbing.src.cli \
 #### 完整示例
 
 ```bash
-# 使用时间拉伸策略，精确匹配字幕时长（使用默认的 index_tts 引擎）
+# 使用时间拉伸策略，精确匹配字幕时长（使用默认的 fish_speech 引擎）
 python -m ai_dubbing.src.cli \
   --srt subtitles/movie.srt \
   --voice voices/narrator.wav \
@@ -161,7 +161,7 @@ python -m ai_dubbing.src.cli \
 | 参数 | 默认值 | 说明 | 示例 |
 |------|--------|------|------|
 | `--strategy` | `stretch` | 时间同步策略 | `--strategy basic` |
-| `--tts-engine` | `index_tts` | 选择TTS引擎。可用: `index_tts`, `f5_tts`, `cosy_voice`, `fish_speech` | `--tts-engine cosy_voice` |
+| `--tts-engine` | `fish_speech` | 选择TTS引擎。可用: `fish_speech`, `index_tts`, `f5_tts`, `cosy_voice` | `--tts-engine cosy_voice` |
 
 ### TTS引擎特定参数
 
