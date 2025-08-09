@@ -62,8 +62,8 @@ apt-get install ffmpeg
 # 或使用conda
 conda install -c conda-forge ffmpeg
 
-# 3. 安装Python依赖
-pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
+# 3. 安装Python依赖（项目通用依赖 + 按CUDA版本安装PyTorch）
+pip install -r requirements.txt
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # 4. 克隆并安装引擎
@@ -94,8 +94,8 @@ apt-get install ffmpeg
 # 或使用conda
 conda install -c conda-forge ffmpeg
 
-# 3. 安装Python依赖
-pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
+# 3. 安装Python依赖（项目通用依赖 + 按CUDA版本安装PyTorch）
+pip install -r requirements.txt
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # 4. 克隆并安装引擎
@@ -128,8 +128,8 @@ apt-get install ffmpeg
 # 或使用conda
 conda install -c conda-forge ffmpeg
 
-# 3. 安装Python依赖
-pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
+# 3. 安装Python依赖（项目通用依赖 + 按CUDA版本安装PyTorch）
+pip install -r requirements.txt
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # 4. 安装引擎
@@ -152,8 +152,8 @@ apt-get install ffmpeg sox libsox-dev
 # 或使用conda
 conda install -c conda-forge ffmpeg
 
-# 3. 安装Python依赖
-pip install librosa numpy soundfile colorama tqdm pysbd python-dotenv
+# 3. 安装Python依赖（项目通用依赖 + 按CUDA版本安装PyTorch）
+pip install -r requirements.txt
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # 4. 克隆并安装引擎
