@@ -179,6 +179,53 @@ python ai_dubbing/run_optimize_subtitles.py
 - 输出 `optimized_srt_output_file` 指定的路径；未配置则默认写入同目录的 `*_llm_optimized.srt`。
 - 时间借用已支持“部分借用”：即使总可借时长小于需求+缓冲，也会尽量借用可用时长。
 
+#### 配置项说明（dubbing.conf）
+
+- 基本配置（仅与优化器相关的项）
+  - `input_file`：必填。要优化的 SRT 文件路径。
+
+- 字幕优化配置（必须放在 `[字幕优化配置]` 小节内）
+  - `llm_api_key`：必填。LLM 服务的 API Key。
+  - `llm_model`：可选，默认 `deepseek-chat`。使用的 LLM 模型名。
+  - `base_url`：可选，默认 `https://api.deepseek.com`。LLM 服务的 Base URL。
+  - `chinese_char_min_time`：可选，单位毫秒，默认 `150`。每个中文字符的最低朗读时间。
+  - `english_word_min_time`：可选，单位毫秒，默认 `250`。每个英文单词的最低朗读时间。
+  - `llm_max_concurrency`：可选，默认 `50`。LLM 请求最大并发数（限流相关）。
+  - `llm_max_retries`：可选，默认 `3`。LLM 请求失败的最大重试次数（指数退避）。
+  - `llm_timeout`：可选，默认 `60`（秒）。单次 LLM 请求超时时间。
+  - `optimized_srt_output_file`：可选。优化后的 SRT 输出路径；未设置则写入同目录 `*_llm_optimized.srt`。
+
+  注意：当前实现会从 `[字幕优化配置]` 读取上述并发与超时参数。如果你曾在其他小节（如“LLM并发与稳定性配置”）定义它们，请移动到 `[字幕优化配置]` 才能生效。
+
+- 时间借用配置（放在 `[时间借用配置]` 小节）
+  - `min_gap_threshold`：可选，单位毫秒，默认 `200`。小于该阈值的相邻空隙不参与借用。
+  - `borrow_ratio`：可选，默认 `1`（范围 0.1–1）。可借用比例，上限占可用空隙的比例。
+  - `extra_buffer`：可选，单位毫秒，默认 `200`。为安全起见在需求上叠加的缓冲时长。
+
+示例（仅优化字幕所需的最小配置）：
+
+```ini
+[基本配置]
+input_file = /path/to/input.srt
+
+[字幕优化配置]
+llm_api_key = sk-xxxxxxxxxxxxxxxxxx
+llm_model = deepseek-chat
+base_url = https://api.deepseek.com
+chinese_char_min_time = 150
+english_word_min_time = 250
+llm_max_concurrency = 50
+llm_max_retries = 3
+llm_timeout = 60
+# 可选：自定义输出路径
+# optimized_srt_output_file = /path/to/input_optimized.srt
+
+[时间借用配置]
+min_gap_threshold = 200
+borrow_ratio = 1
+extra_buffer = 200
+```
+
 ### 其他
 
 
