@@ -104,7 +104,7 @@ python ai_dubbing/run_dubbing.py
 默认使用 `fish_speech` 引擎和 `stretch` 策略：
 
 ```bash
-python -m ai_dubbing.src.cli \
+python -m ai_dubbing.cli \
   --srt input.srt \
   --voice reference.wav \
   --output result.wav \
@@ -115,7 +115,7 @@ python -m ai_dubbing.src.cli \
 
 ```bash
 # 使用时间拉伸策略，精确匹配字幕时长（使用默认的 fish_speech 引擎）
-python -m ai_dubbing.src.cli \
+python -m ai_dubbing.cli \
   --srt subtitles/movie.srt \
   --voice voices/narrator.wav \
   --output output/movie_dubbed.wav \
@@ -123,7 +123,7 @@ python -m ai_dubbing.src.cli \
   --prompt-text "这是参考音频说的话。"
 
 # 使用CosyVoice引擎（需要提供参考文本）
-python -m ai_dubbing.src.cli \
+python -m ai_dubbing.cli \
   --srt subtitles/movie.srt \
   --voice voices/speaker.wav \
   --output output/movie_cosy.wav \
@@ -131,7 +131,7 @@ python -m ai_dubbing.src.cli \
   --prompt-text "这是参考音频说的话。"
 
 # 使用Fish Speech引擎（需要提供参考文本）
-python -m ai_dubbing.src.cli \
+python -m ai_dubbing.cli \
   --srt subtitles/movie.srt \
   --voice voices/speaker.wav \
   --output output/movie_fish.wav \
@@ -139,7 +139,7 @@ python -m ai_dubbing.src.cli \
   --prompt-text "这是参考音频说的话。"
 
 # 使用基础策略，自然语音合成
-python -m ai_dubbing.src.cli \
+python -m ai_dubbing.cli \
   --srt subtitles/movie.srt \
   --voice voices/narrator.wav \
   --output output/movie_natural.wav \

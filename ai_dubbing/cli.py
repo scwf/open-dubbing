@@ -7,17 +7,12 @@
 import argparse
 import time
 
-# 使用绝对导入
-from ai_dubbing.src.utils.common_utils import setup_project_path
-from ai_dubbing.src.config import PATH
-from ai_dubbing.src.parsers import SRTParser, TXTParser
-from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
-from ai_dubbing.src.tts_engines import get_tts_engine, TTS_ENGINES
-from ai_dubbing.src.audio_processor import AudioProcessor
-from ai_dubbing.src.logger import setup_logging, create_process_logger
-
-# 初始化项目环境
-setup_project_path()
+from .config import PATH
+from .parsers import SRTParser, TXTParser
+from .strategies import get_strategy, list_available_strategies, get_strategy_description
+from .tts_engines import get_tts_engine, TTS_ENGINES
+from .audio_processor import AudioProcessor
+from .logger import setup_logging, create_process_logger
 
 
 def main():

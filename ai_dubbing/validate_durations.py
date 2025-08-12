@@ -10,13 +10,9 @@ import argparse
 from pathlib import Path
 from typing import List, Dict, Any
 
-# 获取项目根目录
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from ai_dubbing.src.parsers.srt_parser import SRTParser
-from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer, SubtitleTimingConstants
-from ai_dubbing.src.logger import get_logger
+from .parsers.srt_parser import SRTParser
+from .optimizer.subtitle_optimizer import LLMContextOptimizer, SubtitleTimingConstants
+from .logger import get_logger
 
 
 class DurationValidator:

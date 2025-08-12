@@ -14,11 +14,11 @@ import os
 from typing import List, Dict, Any, Optional
 import ffmpeg
 
-from ai_dubbing.src.tts_engines.base_engine import BaseTTSEngine
-from ai_dubbing.src.config import STRATEGY, LOG
-from ai_dubbing.src.parsers.srt_parser import SRTEntry
-from ai_dubbing.src.strategies.base_strategy import TimeSyncStrategy
-from ai_dubbing.src.logger import get_logger
+from ..tts_engines.base_engine import BaseTTSEngine
+from ..config import STRATEGY, LOG
+from ..parsers.srt_parser import SRTEntry
+from .base_strategy import TimeSyncStrategy
+from ..logger import get_logger
 
 class StretchStrategy(TimeSyncStrategy):
     """时间拉伸同步策略实现"""

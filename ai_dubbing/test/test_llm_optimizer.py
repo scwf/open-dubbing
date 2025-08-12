@@ -7,15 +7,14 @@ LLM字幕优化器测试
 import unittest
 import tempfile
 import os
-import sys
 from pathlib import Path
 
-# 添加项目根目录到路径
-current_file = Path(__file__).resolve()
-sys.path.insert(0, str(current_file.parent.parent.parent))
-
-from ai_dubbing.src.parsers.srt_parser import SRTEntry
-from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer, TimeBorrowOptimizer
+from ..parsers.srt_parser import SRTEntry
+from ..optimizer.subtitle_optimizer import (
+    LLMContextOptimizer,
+    TimeBorrowOptimizer,
+    SubtitleTimingConstants,
+)
 
 
 class TestLLMContextOptimizer(unittest.TestCase):
@@ -36,9 +35,9 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "这是一个测试中文字符密度的字幕"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        # 中文字符数量 * 0.13秒
-        chinese_chars = len(text)  # 每个字符都算
-        expected_duration = chinese_chars * 130
+        # 中文字符数量 * 单字时长
+        chinese_chars = len(text)
+        expected_duration = chinese_chars * SubtitleTimingConstants.CHINESE_CHAR_TIME
         
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
         self.assertEqual(lang_type, 'chinese')
@@ -48,9 +47,9 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "This is a test subtitle for density calculation"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        # 英文单词数量 * 0.25秒
-        english_words = 8  # 8个英文单词
-        expected_duration = english_words * 250
+        # 英文单词数量 * 单词时长
+        english_words = 8
+        expected_duration = english_words * SubtitleTimingConstants.ENGLISH_WORD_TIME
         
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
         self.assertEqual(lang_type, 'english')
@@ -60,7 +59,10 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "这是一个test混合的字幕subtitle"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        expected_duration = 9 * 130 + 2 * 250
+        expected_duration = (
+            9 * SubtitleTimingConstants.CHINESE_CHAR_TIME +
+            2 * SubtitleTimingConstants.ENGLISH_WORD_TIME
+        )
         self.assertEqual(lang_type, 'mixed_cn9_en2')
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
     
@@ -69,14 +71,14 @@ class TestLLMContextOptimizer(unittest.TestCase):
         # 中文字符测试
         text = "正常字幕"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
-        expected = len(text) * 130
+        expected = len(text) * SubtitleTimingConstants.CHINESE_CHAR_TIME
         self.assertAlmostEqual(min_duration, expected, places=2)
         self.assertEqual(lang_type, 'chinese')
         
         # 英文单词测试
         text = "This is test"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
-        expected = 3 * 250  # 3个英文单词
+        expected = 3 * SubtitleTimingConstants.ENGLISH_WORD_TIME
         self.assertAlmostEqual(min_duration, expected, places=2)
         self.assertEqual(lang_type, 'english')
     
@@ -128,7 +130,7 @@ class TestLLMIntegration(unittest.TestCase):
         
     def test_load_sample_srt(self):
         """测试从sample2.srt加载字幕数据"""
-        from ai_dubbing.src.parsers.srt_parser import SRTParser
+        from ..parsers.srt_parser import SRTParser
         
         # 验证文件存在
         self.assertTrue(self.sample_srt.exists(), "sample2.srt文件不存在")
@@ -151,7 +153,7 @@ class TestLLMIntegration(unittest.TestCase):
         
     def test_duration_analysis_on_sample(self):
         """测试对样本字幕进行时长分析"""
-        from ai_dubbing.src.parsers.srt_parser import SRTParser
+        from ..parsers.srt_parser import SRTParser
         
         parser = SRTParser()
         entries = parser.parse_file(str(self.sample_srt))
@@ -165,7 +167,7 @@ class TestLLMIntegration(unittest.TestCase):
         
     def test_save_optimized_srt_with_sample(self):
         """测试使用sample2.srt数据保存优化文件"""
-        from ai_dubbing.src.parsers.srt_parser import SRTParser
+        from ..parsers.srt_parser import SRTParser
         
         # 加载样本字幕
         parser = SRTParser()

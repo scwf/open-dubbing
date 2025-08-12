@@ -2,8 +2,8 @@ import inspect
 from typing import Tuple
 import numpy as np
 from .base_engine import BaseTTSEngine
-from ai_dubbing.src.logger import get_logger
-from ai_dubbing.src.config import F5TTSConfig, AUDIO
+from ..logger import get_logger
+from ..config import F5TTSConfig, AUDIO
 import torch
 
 # 动态导入F5TTS，如果不存在则给出友好提示

@@ -9,10 +9,9 @@ from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 import soundfile as sf
 
-# 使用绝对导入
-from ai_dubbing.src.config import AUDIO
-from ai_dubbing.src.utils.common_utils import create_directory_if_needed
-from ai_dubbing.src.logger import get_logger
+from .config import AUDIO
+from .utils.common_utils import create_directory_if_needed
+from .logger import get_logger
 
 
 class AudioProcessor:

@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from pathlib import Path
 from .base_engine import BaseTTSEngine
-from ai_dubbing.src.logger import get_logger
-from ai_dubbing.src.config import FishSpeechConfig
+from ..logger import get_logger
+from ..config import FishSpeechConfig
 
 logger = get_logger()
 

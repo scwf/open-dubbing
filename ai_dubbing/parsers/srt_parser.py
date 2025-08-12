@@ -7,8 +7,8 @@ SRT字幕文件解析器
 import re
 from typing import List, NamedTuple, Optional
 from pathlib import Path
-from ai_dubbing.src.logger import get_logger
-from ai_dubbing.src.optimizer.subtitle_optimizer import SRTEntry
+from ..logger import get_logger
+from ..optimizer.subtitle_optimizer import SRTEntry
 
 class SRTParser:
     """SRT文件解析器"""

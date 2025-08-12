@@ -17,24 +17,22 @@ SRT配音项目 - 将SRT字幕文件转换为配音音频
 __version__ = "0.1.0"
 __author__ = "AI Dubbing Team"
 
-# 使用绝对导入，更清晰明确
-from ai_dubbing.src.parsers import SRTParser, TXTParser
-from ai_dubbing.src.audio_processor import AudioProcessor
-from ai_dubbing.src.cli import main
+# 包内相对导入
+from .parsers import SRTParser, TXTParser
+from .audio_processor import AudioProcessor
 
-# 导出配置、工具和日志模块  
-from ai_dubbing.src import config
-from ai_dubbing.src import utils
-from ai_dubbing.src import logger
-from ai_dubbing.src import parsers
+# 导出配置、工具和日志模块
+from . import config
+from . import utils
+from . import logger
+from . import parsers
 
 __all__ = [
     "SRTParser",
     "TXTParser",
-    "AudioProcessor", 
-    "main",
+    "AudioProcessor",
     "config",
     "utils",
     "logger",
     "parsers"
-] 
+]

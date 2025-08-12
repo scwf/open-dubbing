@@ -10,7 +10,7 @@ import time
 import random
 from typing import List, Dict, Any, Optional, NamedTuple
 from pathlib import Path
-from ai_dubbing.src.logger import get_logger
+from ..logger import get_logger
 from openai import OpenAI
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -615,7 +615,7 @@ class LLMContextOptimizer:
                           custom_output: Optional[str] = None) -> str:
         """保存优化后的字幕文件"""
         # 延迟导入避免循环导入
-        from ai_dubbing.src.parsers.srt_parser import SRTParser
+        from ..parsers.srt_parser import SRTParser
         
         if custom_output:
             output_path = Path(custom_output)

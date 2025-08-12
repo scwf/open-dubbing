@@ -11,26 +11,14 @@ import sys
 import time
 from pathlib import Path
 
-# 获取项目根目录
 current_file = Path(__file__).resolve()
-project_root = current_file.parent.parent
 
-# 添加到 sys.path（如果还没有的话）
-project_root_str = str(project_root)
-if project_root_str not in sys.path:
-    sys.path.append(project_root_str)
-
-# 使用绝对导入
-from ai_dubbing.src.utils.common_utils import setup_project_path
-from ai_dubbing.src.config import PATH
-from ai_dubbing.src.parsers import SRTParser, TXTParser
-from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
-from ai_dubbing.src.tts_engines import get_tts_engine, TTS_ENGINES
-from ai_dubbing.src.audio_processor import AudioProcessor
-from ai_dubbing.src.logger import setup_logging, create_process_logger, get_logger
-
-# 初始化项目环境
-setup_project_path()
+from .config import PATH
+from .parsers import SRTParser, TXTParser
+from .strategies import get_strategy, list_available_strategies, get_strategy_description
+from .tts_engines import get_tts_engine, TTS_ENGINES
+from .audio_processor import AudioProcessor
+from .logger import setup_logging, create_process_logger, get_logger
 
 def load_config(config_file=str(current_file.parent)+"/dubbing.conf"):
     """加载配置文件，返回配置字典"""

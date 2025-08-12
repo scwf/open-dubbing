@@ -10,10 +10,6 @@ import sys
 import os
 from pathlib import Path
 
-# 添加项目根目录到路径
-current_file = Path(__file__).resolve()
-sys.path.insert(0, str(current_file.parent.parent.parent))
-
 if __name__ == '__main__':
     print("🧪 运行LLM字幕优化器测试...")
     

@@ -7,12 +7,12 @@
 from typing import List, Dict, Any
 import numpy as np
 
-from ai_dubbing.src.tts_engines.base_engine import BaseTTSEngine
-from ai_dubbing.src.utils import validate_file_exists
-from ai_dubbing.src.config import AUDIO, LOG, STRATEGY
-from ai_dubbing.src.parsers.srt_parser import SRTEntry
-from ai_dubbing.src.strategies.base_strategy import TimeSyncStrategy
-from ai_dubbing.src.logger import get_logger
+from ..tts_engines.base_engine import BaseTTSEngine
+from ..utils import validate_file_exists
+from ..config import AUDIO, LOG, STRATEGY
+from ..parsers.srt_parser import SRTEntry
+from .base_strategy import TimeSyncStrategy
+from ..logger import get_logger
 
 class BasicStrategy(TimeSyncStrategy):
     """基础自然合成策略实现"""

@@ -7,10 +7,10 @@ from typing import List, Dict, Any
 import time
 import random
 
-from ai_dubbing.src.tts_engines.base_engine import BaseTTSEngine
-from ai_dubbing.src.parsers.srt_parser import SRTEntry
-from ai_dubbing.src.logger import get_logger, create_process_logger
-from ai_dubbing.src.config import LOG
+from ..tts_engines.base_engine import BaseTTSEngine
+from ..parsers.srt_parser import SRTEntry
+from ..logger import get_logger, create_process_logger
+from ..config import LOG
 
 class TimeSyncStrategy(ABC):
     """时间同步策略抽象基类"""

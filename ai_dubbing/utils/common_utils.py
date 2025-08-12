@@ -5,44 +5,12 @@
 """
 
 import os
-import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Union
 import logging
 import numpy as np
 
-from ai_dubbing.src.config import CosyVoiceConfig, IndexTTSConfig, FishSpeechConfig, AUDIO
-
-
-def setup_project_path():
-    """
-    设置项目路径，确保可以正确导入模块
-    
-    这个函数应该在每个需要导入项目模块的文件开头调用一次。
-    """
-    # 获取项目根目录 (index-tts)
-    current_file = Path(__file__).resolve()
-    project_root = current_file.parent.parent.parent  # ai_dubbing/src/utils/common_utils.py -> index-tts
-    
-    # 添加到 sys.path（如果还没有的话）
-    project_root_str = str(project_root)
-    if project_root_str not in sys.path:
-        sys.path.append(project_root_str)
-
-    # 仅当 CosyVoiceConfig.SOURCE_DIR 存在时才添加到 sys.path
-    if os.path.exists(CosyVoiceConfig.SOURCE_DIR) and CosyVoiceConfig.SOURCE_DIR not in sys.path:
-        sys.path.append(CosyVoiceConfig.SOURCE_DIR)
-        sys.path.append(CosyVoiceConfig.SOURCE_DIR + "/third_party/Matcha-TTS")
-
-    # 仅当 IndexTTSConfig.SOURCE_DIR 存在时才添加到 sys.path
-    if os.path.exists(IndexTTSConfig.SOURCE_DIR) and IndexTTSConfig.SOURCE_DIR not in sys.path:
-        sys.path.append(IndexTTSConfig.SOURCE_DIR)
-
-    # 仅当 FishSpeechConfig.SOURCE_DIR 存在时才添加到 sys.path
-    if os.path.exists(FishSpeechConfig.SOURCE_DIR) and FishSpeechConfig.SOURCE_DIR not in sys.path:
-        sys.path.append(FishSpeechConfig.SOURCE_DIR)
-
-    return project_root
+from ..config import AUDIO
 
 
 def validate_file_exists(file_path: str, file_type: str = "文件") -> bool:
@@ -164,14 +132,3 @@ def normalize_audio_data(audio_data_int16, normalization_factor: Optional[float]
     # 归一化到[-1, 1]的float32
     return audio_data_int16.flatten().astype(np.float32) / normalization_factor
 
-
-# 项目初始化函数
-def initialize_project():
-    """
-    初始化项目环境
-    
-    Returns:
-        Path: project_root_path
-    """
-    project_root = setup_project_path()
-    return project_root

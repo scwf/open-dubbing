@@ -2,9 +2,9 @@ import inspect
 from typing import Tuple, Dict, Any, Optional
 import numpy as np
 from .base_engine import BaseTTSEngine
-from ai_dubbing.src.config import IndexTTSConfig, AUDIO
-from ai_dubbing.src.logger import get_logger
-from ai_dubbing.src.utils import normalize_audio_data
+from ..config import IndexTTSConfig, AUDIO
+from ..logger import get_logger
+from ..utils import normalize_audio_data
 
 # 动态导入IndexTTS，如果不存在则给出友好提示
 try:

@@ -2,7 +2,7 @@
 import pysbd
 from typing import List
 
-from ai_dubbing.src.parsers.srt_parser import SRTEntry
+from .srt_parser import SRTEntry
 
 class TXTParser:
     """

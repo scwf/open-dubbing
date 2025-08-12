@@ -3,9 +3,9 @@ from typing import Tuple, Dict, Any
 import numpy as np
 import torch
 from .base_engine import BaseTTSEngine
-from ai_dubbing.src.logger import get_logger
-from ai_dubbing.src.utils import normalize_audio_data
-from ai_dubbing.src.config import CosyVoiceConfig, AUDIO
+from ..logger import get_logger
+from ..utils import normalize_audio_data
+from ..config import CosyVoiceConfig, AUDIO
 
 logger = get_logger()
 

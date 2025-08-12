@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Dict, Type, Any
 import inspect
 
-from ai_dubbing.src.strategies.base_strategy import TimeSyncStrategy
-from ai_dubbing.src.tts_engines.base_engine import BaseTTSEngine
+from .base_strategy import TimeSyncStrategy
+from ..tts_engines.base_engine import BaseTTSEngine
 
 # 策略注册表
 _strategy_registry: Dict[str, Type[TimeSyncStrategy]] = {}

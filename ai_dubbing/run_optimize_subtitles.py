@@ -11,18 +11,12 @@ import sys
 import configparser
 from pathlib import Path
 
-# 获取项目根目录
 current_file = Path(__file__).resolve()
 ai_dubbing_root = current_file.parent
 
-# 添加到 sys.path（如果还没有的话）
-project_root_str = str(ai_dubbing_root.parent)
-if project_root_str not in sys.path:
-    sys.path.append(project_root_str)
-
-from ai_dubbing.src.parsers.srt_parser import SRTParser
-from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer
-from ai_dubbing.src.logger import get_logger
+from .parsers.srt_parser import SRTParser
+from .optimizer.subtitle_optimizer import LLMContextOptimizer
+from .logger import get_logger
 
 def load_config(config_file=str(current_file.parent / "dubbing.conf")):
     """加载配置文件"""
