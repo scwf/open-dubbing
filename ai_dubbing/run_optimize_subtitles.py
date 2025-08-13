@@ -105,7 +105,7 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
         if not config.get('api_key'):
             logger.error("未配置LLM API密钥，请在 dubbing.conf 文件中设置 llm_api_key")
             return None
-        
+
         optimizer = LLMContextOptimizer(
             api_key=config['api_key'],
             model=config['model'],

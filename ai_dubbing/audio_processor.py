@@ -10,7 +10,7 @@ from pathlib import Path
 import soundfile as sf
 
 from .config import AUDIO
-from .utils.common_utils import create_directory_if_needed
+from .utils import create_directory_if_needed
 from .logger import get_logger
 
 
