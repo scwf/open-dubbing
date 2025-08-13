@@ -23,6 +23,7 @@ class TimeSyncStrategy(ABC):
             tts_engine: 一个遵循BaseTTSEngine接口的TTS引擎实例。
         """
         self.tts_engine = tts_engine
+        self.logger = get_logger()
     
     @staticmethod
     @abstractmethod
@@ -48,7 +49,6 @@ class TimeSyncStrategy(ABC):
         因此默认采用串行执行，避免线程池对GPU的争用与上下文切换开销。
         可通过上层批处理或引擎自身队列优化吞吐。
         """
-        logger = get_logger()
         if not entries:
             return []
 
@@ -60,7 +60,7 @@ class TimeSyncStrategy(ABC):
         process_logger = create_process_logger(f"{self.name()} 策略音频生成")
         process_logger.start(f"处理 {len(entries)} 个字幕条目")
         if max_concurrency and max_concurrency > 1:
-            logger.warning(
+            self.logger.warning(
                 f"检测到 max_concurrency={max_concurrency}，已强制按串行方式执行以避免GPU争用。"
             )
 
@@ -71,7 +71,7 @@ class TimeSyncStrategy(ABC):
                 except Exception as exc:
                     if attempt < max_retries:
                         backoff = min(2 ** attempt, 8) + random.uniform(0, 0.5)
-                        logger.warning(
+                        self.logger.warning(
                             f"条目 {entry_obj.index} 合成失败，重试 {attempt+1}/{max_retries}，{exc}，{backoff:.1f}s 后重试"
                         )
                         time.sleep(backoff)
@@ -88,7 +88,7 @@ class TimeSyncStrategy(ABC):
                 seg = call_with_retry(i, entry)
                 results[i] = seg
             except Exception as e:
-                logger.error(f"条目 {entry.index} 处理失败: {e}")
+                self.logger.error(f"条目 {entry.index} 处理失败: {e}")
                 raise
             completed += 1
             text_preview = entry.text[:LOG.PROGRESS_TEXT_PREVIEW_LENGTH] + "..." \
