@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from .parsers.srt_parser import SRTParser
-from .optimizer.subtitle_optimizer import LLMContextOptimizer, SubtitleTimingConstants
+from .optimizer.subtitle_optimizer import SubtitleTimingConstants
 from .logger import get_logger
 
 

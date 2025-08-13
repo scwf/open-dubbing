@@ -16,7 +16,7 @@ from .logger import get_logger
 
 class AudioProcessor:
     """音频处理器类"""
-    
+
     def __init__(self):
         """
         初始化音频处理器
@@ -25,6 +25,7 @@ class AudioProcessor:
         """
         self.sample_rate = AUDIO.DEFAULT_SAMPLE_RATE  # 固定44.1kHz
         self.audio_segments: List[Dict[str, Any]] = []
+        self.logger = get_logger()
     
 
     def merge_audio_segments(self, segments: List[Dict[str, Any]], 
@@ -44,15 +45,13 @@ class AudioProcessor:
         """
         if not segments:
             return np.array([])
-        
-        logger = get_logger()
-        
+
         # 根据策略选择合并方式
         if strategy_name == "basic":
-            logger.info(f"使用自然拼接模式进行音频合并 (策略: {strategy_name})")
+            self.logger.info(f"使用自然拼接模式进行音频合并 (策略: {strategy_name})")
             return self._natural_concatenation(segments)
         else:
-            logger.info(f"使用时间同步模式进行音频合并 (策略: {strategy_name})")
+            self.logger.info(f"使用时间同步模式进行音频合并 (策略: {strategy_name})")
             return self._time_synchronized_merge(segments)
 
     
@@ -68,8 +67,6 @@ class AudioProcessor:
         Returns:
             拼接后的音频数据
         """
-        logger = get_logger()
-        
         sorted_segments = sorted(segments, key=lambda x: x['index'])
         
         # 收集所有有效的音频数据
@@ -89,14 +86,14 @@ class AudioProcessor:
             audio_parts.append(audio_data)
         
         if not audio_parts:
-            logger.warning("没有有效的音频数据可供拼接")
+            self.logger.warning("没有有效的音频数据可供拼接")
             return np.array([])
-        
+
         # 简单直接拼接所有音频片段
         merged_audio = np.concatenate(audio_parts)
-        
-        logger.success(f"自然拼接完成: {len(audio_parts)} 个片段，总时长 {len(merged_audio)/self.sample_rate:.2f}s")
-        
+
+        self.logger.success(f"自然拼接完成: {len(audio_parts)} 个片段，总时长 {len(merged_audio)/self.sample_rate:.2f}s")
+
         return merged_audio
     
     def _time_synchronized_merge(self, segments: List[Dict[str, Any]]) -> np.ndarray:
@@ -114,8 +111,6 @@ class AudioProcessor:
         Returns:
             合并后的音频数据，严格对齐字幕时间轴
         """
-        logger = get_logger()
-        
         if not segments:
             return np.array([])
         
@@ -126,9 +121,9 @@ class AudioProcessor:
         max_end_time_ms = max(seg['end_time'] for seg in sorted_segments)
         total_samples = int(max_end_time_ms * self.sample_rate // 1000)  # 使用整数运算避免浮点精度损失
         
-        logger.debug("时间同步合并详情:")
-        logger.debug(f"  字幕总时长: {max_end_time_ms / 1000:.2f}s")
-        logger.debug(f"  总样本数: {total_samples}")
+        self.logger.debug("时间同步合并详情:")
+        self.logger.debug(f"  字幕总时长: {max_end_time_ms / 1000:.2f}s")
+        self.logger.debug(f"  总样本数: {total_samples}")
         
         # 创建固定大小的音频数组
         merged_audio = np.zeros(total_samples, dtype=np.float32)
@@ -143,7 +138,7 @@ class AudioProcessor:
             
             # 检查音频数据是否有效
             if len(audio_data) == 0:
-                logger.warning(f"片段 {i+1} (条目 {segment.get('index', '?')}) 音频数据为空")
+                self.logger.warning(f"片段 {i+1} (条目 {segment.get('index', '?')}) 音频数据为空")
                 continue
             
             # 计算精确的时间位置
@@ -155,26 +150,26 @@ class AudioProcessor:
             if target_length == len(audio_data):
                 # 完美匹配，直接放置
                 merged_audio[start_sample:end_sample] = audio_data
-                logger.debug(f"    ✓ 已放置: {start_sample}-{end_sample} 样本")
+                self.logger.debug(f"    ✓ 已放置: {start_sample}-{end_sample} 样本")
             elif len(audio_data) <= target_length:
                 # 音频较短或正好，放置后剩余部分为静音（已在前面处理过）
                 actual_end = start_sample + len(audio_data)
                 merged_audio[start_sample:actual_end] = audio_data
-                logger.debug(f"    ✓ 已放置: {start_sample}-{actual_end} 样本")
+                self.logger.debug(f"    ✓ 已放置: {start_sample}-{actual_end} 样本")
             else:
                 # 音频较长，截断到字幕时长（理论上不应发生，安全处理）
                 merged_audio[start_sample:end_sample] = audio_data[:target_length]
-                logger.warning(f"    ⚠ 音频被截断到字幕时长: {target_length} 样本")
+                self.logger.warning(f"    ⚠ 音频被截断到字幕时长: {target_length} 样本")
         
         # 防止音频过载（混音时可能超过[-1,1]范围）
         max_val = np.max(np.abs(merged_audio))
         if max_val > AUDIO.MAX_AMPLITUDE:
             merged_audio = merged_audio / max_val
-            logger.debug(f"音频归一化: 最大值 {max_val:.2f} -> {AUDIO.MAX_AMPLITUDE}")
+            self.logger.debug(f"音频归一化: 最大值 {max_val:.2f} -> {AUDIO.MAX_AMPLITUDE}")
         
         final_duration = len(merged_audio) / self.sample_rate
-        logger.success(f"时间同步合并完成: 最终时长 {final_duration:.2f}s，与字幕时间轴完全对齐")
-        
+        self.logger.success(f"时间同步合并完成: 最终时长 {final_duration:.2f}s，与字幕时间轴完全对齐")
+
         return merged_audio
 
     
@@ -205,14 +200,12 @@ class AudioProcessor:
             
             # 使用soundfile导出音频
             sf.write(output_path, audio_data, self.sample_rate, format=format.upper())
-            
-            logger = get_logger()
-            logger.success(f"音频已导出到: {output_path}")
+
+            self.logger.success(f"音频已导出到: {output_path}")
             return True
-            
+
         except Exception as e:
-            logger = get_logger()
-            logger.error(f"导出音频失败: {e}")
+            self.logger.error(f"导出音频失败: {e}")
             return False
     
     
