@@ -85,60 +85,63 @@ class StretchStrategy(TimeSyncStrategy):
             # 实际时长小于等于目标时长：直接填充静音
             target_samples = int(target_duration * sampling_rate)
             return self._adjust_length_precisely(audio_data, target_samples)
-            
+
         # 实际时长大于目标时长：使用FFmpeg压缩音频
         try:
-            import io
-            import scipy.io.wavfile as wav
-            
-            # 使用ffmpeg-python的内存管道
-            input_buffer = io.BytesIO()
-            wav.write(input_buffer, sampling_rate, (audio_data * 32767).astype(np.int16))
-            input_buffer.seek(0)
-            
-            # 使用ffmpeg-python同步处理音频
+            output_data = self._run_ffmpeg_atempo(audio_data, sampling_rate, rate)
+            processed_audio = self._post_process_audio(output_data, sampling_rate)
+            return processed_audio
+        except Exception as e:
+            error_msg = str(e)
+            self.logger.error(f"FFmpeg处理失败: {error_msg}")
+            raise RuntimeError(f"FFmpeg处理失败: {error_msg}") from e
+
+    def _run_ffmpeg_atempo(self, audio_data: np.ndarray, sampling_rate: int, rate: float) -> bytes:
+        """运行FFmpeg的atempo滤镜并返回原始音频数据"""
+        import io
+        import scipy.io.wavfile as wav
+
+        input_buffer = io.BytesIO()
+        wav.write(input_buffer, sampling_rate, (audio_data * 32767).astype(np.int16))
+        input_buffer.seek(0)
+
+        try:
             output_data, _ = (
                 ffmpeg
                 .input('pipe:', format='wav')
                 .filter('atempo', rate)
-                .output('pipe:', format='wav', 
-                       ar=sampling_rate, 
-                       ac=1, 
-                       sample_fmt='s16',
-                       loglevel='error')
+                .output('pipe:', format='wav', ar=sampling_rate, ac=1,
+                        sample_fmt='s16', loglevel='error')
                 .overwrite_output()
                 .run(input=input_buffer.getvalue(), capture_stdout=True, capture_stderr=True)
             )
-            
-            if not output_data:
-                raise ValueError("FFmpeg输出为空")
-            
-            # 读取处理后的音频
-            output_buffer = io.BytesIO(output_data)
-            _, processed_audio = wav.read(output_buffer)
-            
-            if processed_audio is None or len(processed_audio) == 0:
-                raise ValueError("FFmpeg未能生成有效音频数据")
-            
-            processed_audio = processed_audio.astype(np.float32) / 32767.0
-            
-            # # 验证并精确调整时长
-            # actual_duration = len(processed_audio) / sampling_rate
-            # duration_diff = abs(actual_duration - target_duration)
-            
-            # if duration_diff > 0.01:  # 10ms误差容限
-            #     self.logger.info(f"FFmpeg变速后时长微调: {actual_duration:.3f}s -> {target_duration:.3f}s")
-            #     target_samples = int(target_duration * sampling_rate)
-            #     return self._adjust_length_precisely(processed_audio, target_samples)
-            
-            return processed_audio
-            
         except Exception as e:
             error_msg = str(e)
             if hasattr(e, 'stderr') and e.stderr:
                 error_msg = e.stderr.decode()
-            self.logger.error(f"FFmpeg处理失败: {error_msg}")
-            raise RuntimeError(f"FFmpeg处理失败: {error_msg}") from e
+            raise RuntimeError(error_msg) from e
+
+        if not output_data:
+            raise ValueError("FFmpeg输出为空")
+
+        return output_data
+
+    def _post_process_audio(self, output_data: bytes, sampling_rate: int) -> np.ndarray:
+        """处理FFmpeg输出并转换为浮点音频数据"""
+        import io
+        import scipy.io.wavfile as wav
+
+        try:
+            output_buffer = io.BytesIO(output_data)
+            _, processed_audio = wav.read(output_buffer)
+        except Exception as e:
+            error_msg = str(e)
+            raise RuntimeError(error_msg) from e
+
+        if processed_audio is None or len(processed_audio) == 0:
+            raise ValueError("FFmpeg未能生成有效音频数据")
+
+        return processed_audio.astype(np.float32) / 32767.0
     
     def _adjust_length_precisely(self, audio_data: np.ndarray, target_samples: int) -> np.ndarray:
         """
