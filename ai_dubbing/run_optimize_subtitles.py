@@ -21,7 +21,6 @@ if project_root_str not in sys.path:
     sys.path.append(project_root_str)
 
 from ai_dubbing.src.parsers.srt_parser import SRTParser
-from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer
 from ai_dubbing.src.logger import get_logger
 
 def load_config(config_file=str(current_file.parent / "dubbing.conf")):
@@ -111,7 +110,8 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
         if not config.get('api_key'):
             logger.error("未配置LLM API密钥，请在 dubbing.conf 文件中设置 llm_api_key")
             return None
-        
+
+        from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer
         optimizer = LLMContextOptimizer(
             api_key=config['api_key'],
             model=config['model'],

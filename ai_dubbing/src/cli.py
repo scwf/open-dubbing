@@ -8,7 +8,7 @@ import argparse
 import time
 
 # 使用绝对导入
-from ai_dubbing.src.utils.common_utils import setup_project_path
+from ai_dubbing.src.utils import setup_project_path
 from ai_dubbing.src.config import PATH
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
