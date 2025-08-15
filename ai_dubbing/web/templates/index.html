@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Dubbing</title>
+</head>
+<body>
+  <h1>AI Dubbing</h1>
+  <form id="dubbing-form" enctype="multipart/form-data">
+    <div>
+      <label>SRT/TXT File:
+        <input type="file" name="input_file" accept=".srt,.txt" required>
+      </label>
+    </div>
+    <div>
+      <label>Voice Files:
+        <input type="file" name="voice_files" accept=".wav,.mp3" multiple required>
+      </label>
+    </div>
+    <div>
+      <label>Prompt/Ref Text:
+        <textarea name="prompt_text" rows="3"></textarea>
+      </label>
+    </div>
+    <div>
+      <label>TTS Engine:
+        <select name="tts_engine" id="tts_engine"></select>
+      </label>
+    </div>
+    <div>
+      <label>Strategy:
+        <select name="strategy" id="strategy"></select>
+      </label>
+    </div>
+    <div>
+      <label>Language:
+        <select name="language" id="language"></select>
+      </label>
+    </div>
+    <button type="submit">Start Dubbing</button>
+  </form>
+  <div id="status"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
