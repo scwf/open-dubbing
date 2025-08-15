@@ -10,3 +10,6 @@ pysbd
 python-dotenv
 soundfile
 tqdm
+fastapi
+uvicorn
+jinja2
