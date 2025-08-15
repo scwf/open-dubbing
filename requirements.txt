@@ -3,6 +3,7 @@
 
 colorama
 ffmpeg-python
+fastapi
 librosa
 numpy
 openai
@@ -10,3 +11,4 @@ pysbd
 python-dotenv
 soundfile
 tqdm
+uvicorn

@@ -146,6 +146,16 @@ python -m ai_dubbing.src.cli \
   --strategy basic
 ```
 
+### 方式三：FastAPI Web 服务
+
+也可以通过 FastAPI 提供的 HTTP 接口启动配音服务：
+
+```bash
+uvicorn ai_dubbing.web.server:app
+```
+
+服务启动后，向 `POST /dubbing` 上传字幕文件（SRT 或 TXT）、参考音频，并指定 `tts_engine`、`strategy`、`language`、`prompt_text` 或 `ref_text` 等参数，即可获得生成的音频文件路径。
+
 ## 🔧 命令行参数
 
 ### 核心参数
