@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Dubbing - 智能配音系统</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <i class="fas fa-microphone-alt"></i>
+          <h1>AI Dubbing</h1>
+        </div>
+        <p class="subtitle">智能配音系统 - 让文字拥有声音</p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="form-container">
+        <form id="dubbing-form" enctype="multipart/form-data">
+          
+          <!-- File Upload Section -->
+          <div class="upload-section">
+            <h2><i class="fas fa-file-upload"></i> 文件上传</h2>
+            
+            <!-- SRT/TXT File Upload -->
+            <div class="upload-group">
+              <label class="upload-label">
+                <i class="fas fa-file-text"></i>
+                <span>SRT/TXT 文件</span>
+                <small>支持 .srt 和 .txt 格式</small>
+              </label>
+              <div class="file-upload-area" data-type="srt">
+                <input type="file" name="input_file" accept=".srt,.txt" required class="file-input">
+                <div class="upload-content">
+                  <i class="fas fa-cloud-upload-alt"></i>
+                  <p>点击选择文件或拖拽到此处</p>
+                  <span class="file-name">未选择文件</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Voice Files Upload -->
+            <div id="voice-pairs-container">
+              <!-- Voice pair template will be inserted here -->
+            </div>
+            <button type="button" id="add-voice-pair-btn" class="add-pair-btn">
+              <i class="fas fa-plus"></i> 添加参考音频
+            </button>
+          </div>
+
+          <!-- Configuration Section -->
+          <div class="config-section">
+            <h2><i class="fas fa-cogs"></i> 配置选项</h2>
+            <!-- Options Row -->
+            <div class="options-row">
+              <div class="form-group">
+                <label class="form-label">
+                  <i class="fas fa-robot"></i>
+                  <span>TTS 引擎</span>
+                </label>
+                <select name="tts_engine" id="tts_engine" class="form-select">
+                  <option value="">加载中...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">
+                  <i class="fas fa-chess"></i>
+                  <span>策略</span>
+                </label>
+                <select name="strategy" id="strategy" class="form-select">
+                  <option value="">加载中...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">
+                  <i class="fas fa-globe"></i>
+                  <span>语言</span>
+                </label>
+                <select name="language" id="language" class="form-select">
+                  <option value="">加载中...</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="config-section">
+            <h2><i class="fas fa-cogs"></i> 高级配置</h2>
+            <div class="tabs">
+              <div class="tab-header">
+                <button type="button" class="tab-link active" data-tab="tab-concurrency">并发配置</button>
+                <button type="button" class="tab-link" data-tab="tab-subtitle">字幕优化</button>
+                <button type="button" class="tab-link" data-tab="tab-time">时间借用</button>
+              </div>
+              <div id="tab-concurrency" class="tab-content active">
+                <!-- Concurrency settings will go here -->
+              </div>
+              <div id="tab-subtitle" class="tab-content">
+                <!-- Subtitle optimization settings will go here -->
+              </div>
+              <div id="tab-time" class="tab-content">
+                <!-- Time borrowing settings will go here -->
+              </div>
+            </div>
+            <button type="button" id="save-config-btn" class="submit-btn"><i class="fas fa-save"></i> 保存配置</button>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="submit-section">
+            <button type="submit" class="submit-btn" id="submit-btn">
+              <i class="fas fa-play"></i>
+              <span>开始配音</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Status Section -->
+      <div class="status-section" id="status-section" style="display: none;">
+        <div class="status-content">
+          <div class="status-icon">
+            <i class="fas fa-spinner fa-spin"></i>
+          </div>
+          <div class="status-text">
+            <h3 id="status-title">处理中...</h3>
+            <p id="status-message">正在上传文件并开始配音处理</p>
+          </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="progress-container" id="progress-container" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <span class="progress-text" id="progress-text">0%</span>
+        </div>
+
+        <!-- Result Section -->
+        <div class="result-section" id="result-section" style="display: none;">
+          <div class="result-content">
+            <i class="fas fa-check-circle success-icon"></i>
+            <h3>配音完成！</h3>
+            <p>您的配音文件已准备就绪</p>
+            <a href="#" id="download-link" class="download-btn" target="_blank">
+              <i class="fas fa-download"></i>
+              <span>下载结果</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>&copy; 2024 AI Dubbing. 智能配音，让创意发声。</p>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

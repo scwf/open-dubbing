@@ -16,3 +16,5 @@ input/
 **/*.env
 **/*.conf
 CLAUDE.md
+outputs/
+uploads/
