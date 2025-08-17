@@ -20,7 +20,6 @@ __author__ = "AI Dubbing Team"
 # 使用绝对导入，更清晰明确
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.audio_processor import AudioProcessor
-from ai_dubbing.src.cli import main
 
 # 导出配置、工具和日志模块  
 from ai_dubbing.src import config
