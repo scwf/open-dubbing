@@ -57,6 +57,8 @@ class TimeSyncStrategy(ABC):
         # 过滤掉并发控制相关参数，避免传递给底层引擎
         filtered_kwargs = {k: v for k, v in kwargs.items() if k not in {'max_concurrency', 'max_retries'}}
 
+        progress_callback = kwargs.get("progress_callback")
+
         process_logger = create_process_logger(f"{self.name()} 策略音频生成")
         process_logger.start(f"处理 {len(entries)} 个字幕条目")
         if max_concurrency and max_concurrency > 1:
@@ -91,10 +93,12 @@ class TimeSyncStrategy(ABC):
                 self.logger.error(f"条目 {entry.index} 处理失败: {e}")
                 raise
             completed += 1
+            if progress_callback:
+                progress_callback(completed, len(entries))
             text_preview = entry.text[:LOG.PROGRESS_TEXT_PREVIEW_LENGTH] + "..." \
                 if len(entry.text) > LOG.PROGRESS_TEXT_PREVIEW_LENGTH else entry.text
             process_logger.progress(completed, len(entries), f"条目 {entry.index}: {text_preview}")
 
         elapsed = time.time() - start_ts
         process_logger.complete(f"生成 {len(results)} 个音频片段（耗时 {elapsed:.2f}s）")
-        return results
+        return [r for r in results if r]
