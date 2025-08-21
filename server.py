@@ -239,8 +239,6 @@ async def create_dubbing(
             final_voice_paths.append(str(file_path))
         elif i < len(voice_files_paths) and voice_files_paths[i]:
             path_from_config = voice_files_paths[i]
-            if ".." in path_from_config or path_from_config.startswith(("/", "\\")):
-                raise HTTPException(status_code=400, detail=f"Invalid file path: {path_from_config}")
             final_voice_paths.append(path_from_config)
 
     if len(final_voice_paths) != len(prompt_texts):
