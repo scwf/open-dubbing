@@ -69,15 +69,65 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize the application
   initApp();
 
-  function initApp() {
-    loadOptions();
-    loadConfig();
+  async function initApp() {
+    await loadOptions();
+    const basicConfig = await loadConfig();
     setupFileUploads();
     setupFormSubmission();
     setupFormValidation();
     setupConfigSaving();
     setupTabs();
     setupPasswordToggle();
+    
+    // Populate voice pairs with config data if available
+    if (basicConfig && basicConfig.voice_files && basicConfig.prompt_texts) {
+      populateVoicePairsFromConfig(basicConfig);
+    }
+  }
+
+  function populateVoicePairsFromConfig(basicConfig) {
+    try {
+      // Clear existing voice pairs
+      voicePairsContainer.innerHTML = '';
+      
+      // Parse voice files and prompt texts from config
+      const voiceFiles = basicConfig.voice_files.split(',').map(file => file.trim());
+      const promptTexts = basicConfig.prompt_texts.split(',').map(text => text.trim());
+      
+      // Create voice pairs for each config entry
+      for (let i = 0; i < voiceFiles.length; i++) {
+        if (i >= promptTexts.length) break;
+        
+        const pairDiv = document.createElement('div');
+        pairDiv.classList.add('voice-pair');
+        pairDiv.innerHTML = `
+          <div class="file-upload-area" data-type="voice">
+            <input type="file" name="voice_files" accept=".wav,.mp3" required class="file-input">
+            <div class="upload-content">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <p>选择语音文件</p>
+              <span class="file-name">${voiceFiles[i]}</span>
+            </div>
+          </div>
+          <textarea name="prompt_texts" placeholder="输入参考文本..." class="form-textarea" required>${promptTexts[i]}</textarea>
+          <button type="button" class="remove-pair-btn"><i class="fas fa-trash"></i></button>
+        `;
+
+        const input = pairDiv.querySelector('.file-input');
+        const uploadArea = pairDiv.querySelector('.file-upload-area');
+        
+        input.addEventListener('change', (e) => handleFileSelection(e, uploadArea, 'voice'));
+        
+        const removeBtn = pairDiv.querySelector('.remove-pair-btn');
+        removeBtn.addEventListener('click', () => {
+          pairDiv.remove();
+        });
+
+        voicePairsContainer.appendChild(pairDiv);
+      }
+    } catch (error) {
+      console.error('Failed to populate voice pairs from config:', error);
+    }
   }
 
   function setupPasswordToggle() {
@@ -180,6 +230,19 @@ async function loadConfig() {
       const response = await fetch('/dubbing/config');
       const data = await response.json();
       
+      // Set basic configuration values
+      if (data.basic) {
+        if (data.basic.tts_engine) {
+          document.getElementById('tts_engine').value = data.basic.tts_engine;
+        }
+        if (data.basic.strategy) {
+          document.getElementById('strategy').value = data.basic.strategy;
+        }
+        if (data.basic.language) {
+          document.getElementById('language').value = data.basic.language;
+        }
+      }
+      
       const concurrencyTab = document.getElementById('tab-concurrency');
       concurrencyTab.innerHTML = `
         <div class="options-row">
@@ -256,8 +319,11 @@ async function loadConfig() {
           </div>
         </div>
       `;
+
+      return data.basic;
     } catch (error) {
       console.error('Failed to load config:', error);
+      return null;
     }
   }
 

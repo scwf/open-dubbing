@@ -61,6 +61,13 @@ async def get_dubbing_config():
     config.read(CONFIG_FILE, encoding="utf-8")
     
     config_data = {
+        "basic": {
+            "voice_files": config.get("基本配置", "voice_files", fallback=""),
+            "prompt_texts": config.get("基本配置", "prompt_texts", fallback=""),
+            "tts_engine": config.get("基本配置", "tts_engine", fallback="fish_speech"),
+            "strategy": config.get("基本配置", "strategy", fallback="stretch"),
+            "language": config.get("高级配置", "language", fallback="zh"),
+        },
         "concurrency": {
             "tts_max_concurrency": config.getint("并发配置", "tts_max_concurrency", fallback=8),
             "tts_max_retries": config.getint("并发配置", "tts_max_retries", fallback=2),
