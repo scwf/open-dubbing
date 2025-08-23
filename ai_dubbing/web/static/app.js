@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const voicePairsContainer = document.getElementById('voice-pairs-container');
   const addVoicePairBtn = document.getElementById('add-voice-pair-btn');
   let pairCount = 0;
+  let currentTaskInterval = null; // 全局变量追踪当前任务的轮询interval
 
   function createVoicePair() {
     pairCount++;
@@ -455,6 +456,9 @@ async function loadConfig() {
       return;
     }
 
+    // 清理之前的任务状态
+    cleanupPreviousTask();
+    
     showStatus('准备中...', '正在准备文件上传...');
     statusSection.style.display = 'block';
     setFormLoading(true);
@@ -523,7 +527,9 @@ async function loadConfig() {
 
   async function pollTaskStatus(taskId) {
     showProgress();
-    const interval = setInterval(async () => {
+    
+    // 定义状态检查函数
+    const checkStatus = async () => {
       try {
         const response = await fetch(`/dubbing/status/${taskId}`);
         if (!response.ok) {
@@ -532,31 +538,92 @@ async function loadConfig() {
         
         const data = await response.json();
         
+        // 只在开发模式下显示详细日志
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          console.log('任务状态更新:', { 
+            taskId, 
+            status: data.status, 
+            progress: data.progress, 
+            message: data.message 
+          });
+        }
+        
         statusTitle.textContent = "处理中...";
         statusMessage.textContent = data.message || `当前进度: ${data.progress}%`;
         updateProgress(data.progress);
         
         if (data.status === 'completed') {
-          clearInterval(interval);
+          if (currentTaskInterval) {
+            clearInterval(currentTaskInterval);
+            currentTaskInterval = null;
+          }
           showResult(data.result_url);
           setFormLoading(false);
+          return true; // 任务完成
         } else if (data.status === 'failed') {
-          clearInterval(interval);
+          if (currentTaskInterval) {
+            clearInterval(currentTaskInterval);
+            currentTaskInterval = null;
+          }
           showError(`处理失败: ${data.error || '未知错误'}`);
           setFormLoading(false);
+          return true; // 任务失败
         }
+        return false; // 继续轮询
       } catch (error) {
         console.error('Polling error:', error);
-        clearInterval(interval);
+        if (currentTaskInterval) {
+          clearInterval(currentTaskInterval);
+          currentTaskInterval = null;
+        }
         showError('无法轮询任务状态');
         setFormLoading(false);
+        return true; // 停止轮询
       }
-    }, 2000);
+    };
+    
+    // 立即执行第一次检查，避免等待轮询间隔
+    if (await checkStatus()) {
+      return; // 任务已完成或失败，无需轮询
+    }
+    
+    // 设置高频轮询以捕获快速状态变化 (500ms间隔)
+    currentTaskInterval = setInterval(async () => {
+      if (await checkStatus()) {
+        if (currentTaskInterval) {
+          clearInterval(currentTaskInterval);
+          currentTaskInterval = null;
+        }
+      }
+    }, 500);
   }
 
   function updateProgress(progress) {
     progressFill.style.width = `${progress}%`;
     progressText.textContent = `${Math.round(progress)}%`;
+  }
+
+  function cleanupPreviousTask() {
+    // 清理之前的轮询interval
+    if (currentTaskInterval) {
+      clearInterval(currentTaskInterval);
+      currentTaskInterval = null;
+    }
+    
+    // 重置状态界面元素的显示状态
+    statusTitle.style.display = '';
+    statusMessage.style.display = '';
+    const statusIcon = document.querySelector('.status-icon');
+    if (statusIcon) {
+      statusIcon.style.display = '';
+    }
+    
+    // 重置进度条
+    updateProgress(0);
+    
+    // 隐藏结果区域
+    resultSection.style.display = 'none';
+    progressContainer.style.display = 'none';
   }
 
   function validateForm() {
@@ -646,9 +713,15 @@ async function loadConfig() {
   }
 
   function showResult(resultUrl) {
-    statusTitle.style.display = 'none';
-    statusMessage.style.display = 'none';
-    document.querySelector('.status-icon').style.display = 'none';
+    // 显示完成状态而不是隐藏状态元素
+    statusTitle.textContent = '配音完成';
+    statusMessage.textContent = '您的配音文件已准备就绪，可以下载了！';
+    
+    // 隐藏加载图标
+    const statusIcon = document.querySelector('.status-icon');
+    if (statusIcon) {
+      statusIcon.style.display = 'none';
+    }
 
     downloadLink.href = resultUrl;
     downloadLink.download = resultUrl.split('/').pop();

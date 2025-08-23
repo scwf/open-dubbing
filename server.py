@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
-from ai_dubbing.src.tts_engines import get_tts_engine, TTS_ENGINES
+from ai_dubbing.src.tts_engines import get_tts_engine, TTS_ENGINES, cleanup_all_engines
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.audio_processor import AudioProcessor
@@ -271,6 +271,16 @@ async def get_dubbing_status(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@app.post("/dubbing/cleanup")
+async def cleanup_gpu_memory():
+    """手动清理所有TTS引擎的GPU内存"""
+    try:
+        cleanup_all_engines()
+        return {"status": "success", "message": "GPU内存已清理"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"清理GPU内存失败: {str(e)}")
 
 
 if __name__ == "__main__":

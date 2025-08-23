@@ -24,3 +24,10 @@ class BaseTTSEngine(ABC):
         """
         pass
 
+    def cleanup(self):
+        """
+        清理引擎资源。
+        子类应该重写此方法来释放GPU内存等资源。
+        """
+        pass
+
