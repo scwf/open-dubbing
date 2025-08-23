@@ -10,6 +10,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadLink = document.getElementById('download-link');
   const submitBtn = document.getElementById('submit-btn');
 
+  // Optimization status elements
+  const optimizationStatusSection = document.getElementById('optimization-status-section');
+  const optimizationStatusTitle = document.getElementById('optimization-status-title');
+  const optimizationStatusMessage = document.getElementById('optimization-status-message');
+  const optimizationProgressContainer = document.getElementById('optimization-progress-container');
+  const optimizationProgressFill = document.getElementById('optimization-progress-fill');
+  const optimizationProgressText = document.getElementById('optimization-progress-text');
+  const optimizationResultSection = document.getElementById('optimization-result-section');
+  const optimizationDownloadLink = document.getElementById('optimization-download-link');
+
+  // Dubbing status elements
+  const dubbingStatusSection = document.getElementById('dubbing-status-section');
+  const dubbingStatusTitle = document.getElementById('dubbing-status-title');
+  const dubbingStatusMessage = document.getElementById('dubbing-status-message');
+  const dubbingProgressContainer = document.getElementById('dubbing-progress-container');
+  const dubbingProgressFill = document.getElementById('dubbing-progress-fill');
+  const dubbingProgressText = document.getElementById('dubbing-progress-text');
+  const dubbingResultSection = document.getElementById('dubbing-result-section');
+  const dubbingDownloadLink = document.getElementById('dubbing-download-link');
+
   // Subtitle optimization elements
   const optimizationForm = document.getElementById('optimization-form');
   const optimizeBtn = document.getElementById('optimize-btn');
@@ -81,7 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFormSubmission();
     setupOptimizationForm();
     setupFormValidation();
-    setupConfigSaving();
     setupTabs();
     setupMainTabs();
     setupPasswordToggle();
@@ -326,47 +345,29 @@ async function loadConfig() {
     }
   }
 
-  function setupConfigSaving() {
-    const saveBtn = document.getElementById('save-config-btn');
-    if (!saveBtn) return;
-    
-    saveBtn.addEventListener('click', async () => {
-      const configData = {
-        concurrency: {
-          tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]')?.value || '',
-          tts_max_retries: document.querySelector('[name="tts_max_retries"]')?.value || '',
-        },
-        subtitle_optimization: {
-          llm_api_key: document.querySelector('input[name="opt_llm_api_key"]')?.value || '',
-          llm_model: document.querySelector('input[name="opt_llm_model"]')?.value || '',
-          base_url: document.querySelector('input[name="opt_base_url"]')?.value || '',
-          chinese_char_min_time: document.querySelector('input[name="opt_chinese_char_min_time"]')?.value || '',
-          english_word_min_time: document.querySelector('input[name="opt_english_word_min_time"]')?.value || '',
-          llm_max_concurrency: document.querySelector('input[name="opt_llm_max_concurrency"]')?.value || '',
-          llm_max_retries: document.querySelector('input[name="opt_llm_max_retries"]')?.value || '',
-          llm_timeout: document.querySelector('input[name="opt_llm_timeout"]')?.value || '',
-        },
-        time_borrowing: {
-          min_gap_threshold: document.querySelector('input[name="opt_min_gap_threshold"]')?.value || '',
-          borrow_ratio: document.querySelector('input[name="opt_borrow_ratio"]')?.value || '',
-          extra_buffer: document.querySelector('input[name="opt_extra_buffer"]')?.value || '',
-        }
-      };
-      
-      try {
-        await fetch('/dubbing/config', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(configData),
-        });
-        alert('配置已保存！');
-      } catch (error) {
-        console.error('Failed to save config:', error);
-        alert('配置保存失败！');
+  // Get form configuration data for saving
+  function getFormConfig() {
+    return {
+      concurrency: {
+        tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]')?.value || '',
+        tts_max_retries: document.querySelector('[name="tts_max_retries"]')?.value || '',
+      },
+      subtitle_optimization: {
+        llm_api_key: document.querySelector('input[name="opt_llm_api_key"]')?.value || '',
+        llm_model: document.querySelector('input[name="opt_llm_model"]')?.value || '',
+        base_url: document.querySelector('input[name="opt_base_url"]')?.value || '',
+        chinese_char_min_time: document.querySelector('input[name="opt_chinese_char_min_time"]')?.value || '',
+        english_word_min_time: document.querySelector('input[name="opt_english_word_min_time"]')?.value || '',
+        llm_max_concurrency: document.querySelector('input[name="opt_llm_max_concurrency"]')?.value || '',
+        llm_max_retries: document.querySelector('input[name="opt_llm_max_retries"]')?.value || '',
+        llm_timeout: document.querySelector('input[name="opt_llm_timeout"]')?.value || '',
+      },
+      time_borrowing: {
+        min_gap_threshold: document.querySelector('input[name="opt_min_gap_threshold"]')?.value || '',
+        borrow_ratio: document.querySelector('input[name="opt_borrow_ratio"]')?.value || '',
+        extra_buffer: document.querySelector('input[name="opt_extra_buffer"]')?.value || '',
       }
-    });
+    };
   }
 
   // Setup file upload functionality
@@ -492,13 +493,47 @@ async function loadConfig() {
     }
 
     // 清理之前的任务状态
-    cleanupPreviousTask();
+    cleanupOptimizationTask();
     
-    showStatus('准备中...', '正在准备字幕优化...');
-    statusSection.style.display = 'block';
+    showOptimizationStatus('准备中...', '正在保存配置并准备字幕优化...');
+    optimizationStatusSection.style.display = 'block';
     setOptimizationLoading(true);
     
     try {
+      // 首先保存字幕优化配置
+      const configData = {
+        concurrency: {
+          tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]')?.value || '',
+          tts_max_retries: document.querySelector('[name="tts_max_retries"]')?.value || '',
+        },
+        subtitle_optimization: {
+          llm_api_key: document.querySelector('input[name="opt_llm_api_key"]')?.value || '',
+          llm_model: document.querySelector('input[name="opt_llm_model"]')?.value || '',
+          base_url: document.querySelector('input[name="opt_base_url"]')?.value || '',
+          chinese_char_min_time: document.querySelector('input[name="opt_chinese_char_min_time"]')?.value || '',
+          english_word_min_time: document.querySelector('input[name="opt_english_word_min_time"]')?.value || '',
+          llm_max_concurrency: document.querySelector('input[name="opt_llm_max_concurrency"]')?.value || '',
+          llm_max_retries: document.querySelector('input[name="opt_llm_max_retries"]')?.value || '',
+          llm_timeout: document.querySelector('input[name="opt_llm_timeout"]')?.value || '',
+        },
+        time_borrowing: {
+          min_gap_threshold: document.querySelector('input[name="opt_min_gap_threshold"]')?.value || '',
+          borrow_ratio: document.querySelector('input[name="opt_borrow_ratio"]')?.value || '',
+          extra_buffer: document.querySelector('input[name="opt_extra_buffer"]')?.value || '',
+        }
+      };
+
+      // 保存配置
+      await fetch('/dubbing/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(configData),
+      });
+
+      showOptimizationStatus('准备中...', '配置已保存，正在开始字幕优化...');
+
       const formData = new FormData();
       formData.append('input_file', file);
 
@@ -522,7 +557,7 @@ async function loadConfig() {
       
     } catch (error) {
       console.error('Optimization error:', error);
-      showError(`字幕优化失败: ${error.message}`);
+      showOptimizationError(`字幕优化失败: ${error.message}`);
       setOptimizationLoading(false);
     }
   }
@@ -545,13 +580,34 @@ async function loadConfig() {
     }
 
     // 清理之前的任务状态
-    cleanupPreviousTask();
+    cleanupDubbingTask();
     
-    showStatus('准备中...', '正在准备文件上传...');
-    statusSection.style.display = 'block';
+    showDubbingStatus('准备中...', '正在保存配置...');
+    dubbingStatusSection.style.display = 'block';
     setFormLoading(true);
     
     try {
+      // 自动保存配置 - 和字幕优化保持一致
+      const configData = getFormConfig();
+      try {
+        const configResponse = await fetch('/dubbing/config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(configData)
+        });
+        
+        if (configResponse.ok) {
+          showDubbingStatus('准备中...', '配置已保存，正在准备文件上传...');
+        } else {
+          console.warn('配置保存失败，但继续执行配音任务');
+          showDubbingStatus('准备中...', '正在准备文件上传...');
+        }
+      } catch (configError) {
+        console.warn('配置保存出错:', configError);
+        showDubbingStatus('准备中...', '正在准备文件上传...');
+      }
       const formData = new FormData();
 
       // Append standard fields
@@ -608,13 +664,17 @@ async function loadConfig() {
       
     } catch (error) {
       console.error('Submission error:', error);
-      showError(`处理失败: ${error.message}`);
+      showDubbingError(`配音失败: ${error.message}`);
       setFormLoading(false);
     }
   }
 
   async function pollTaskStatus(taskId, taskType = 'dubbing') {
-    showProgress();
+    if (taskType === 'optimization') {
+      showOptimizationProgress();
+    } else {
+      showDubbingProgress();
+    }
     
     // 根据任务类型确定状态查询URL
     const statusUrl = taskType === 'optimization' 
@@ -642,22 +702,28 @@ async function loadConfig() {
           });
         }
         
-        // 根据任务类型设置标题
-        const taskTitle = taskType === 'optimization' ? '字幕优化中...' : '配音处理中...';
-        statusTitle.textContent = taskTitle;
-        statusMessage.textContent = data.message || `当前进度: ${data.progress}%`;
-        updateProgress(data.progress);
+        // 根据任务类型更新状态
+        if (taskType === 'optimization') {
+          optimizationStatusTitle.textContent = '字幕优化中...';
+          optimizationStatusMessage.textContent = data.message || `当前进度: ${data.progress}%`;
+          updateOptimizationProgress(data.progress);
+        } else {
+          dubbingStatusTitle.textContent = '配音处理中...';
+          dubbingStatusMessage.textContent = data.message || `当前进度: ${data.progress}%`;
+          updateDubbingProgress(data.progress);
+        }
         
         if (data.status === 'completed') {
           if (currentTaskInterval) {
             clearInterval(currentTaskInterval);
             currentTaskInterval = null;
           }
-          showResult(data.result_url);
-          // 根据任务类型重置对应的按钮状态
+          // 根据任务类型显示结果
           if (taskType === 'optimization') {
+            showOptimizationResult(data.result_url);
             setOptimizationLoading(false);
           } else {
+            showDubbingResult(data.result_url);
             setFormLoading(false);
           }
           return true; // 任务完成
@@ -666,11 +732,11 @@ async function loadConfig() {
             clearInterval(currentTaskInterval);
             currentTaskInterval = null;
           }
-          showError(`处理失败: ${data.error || '未知错误'}`);
-          // 根据任务类型重置对应的按钮状态
           if (taskType === 'optimization') {
+            showOptimizationError(`字幕优化失败: ${data.error || '未知错误'}`);
             setOptimizationLoading(false);
           } else {
+            showDubbingError(`配音失败: ${data.error || '未知错误'}`);
             setFormLoading(false);
           }
           return true; // 任务失败
@@ -682,11 +748,11 @@ async function loadConfig() {
           clearInterval(currentTaskInterval);
           currentTaskInterval = null;
         }
-        showError('无法轮询任务状态');
-        // 根据任务类型重置对应的按钮状态
         if (taskType === 'optimization') {
+          showOptimizationError('无法轮询任务状态');
           setOptimizationLoading(false);
         } else {
+          showDubbingError('无法轮询任务状态');
           setFormLoading(false);
         }
         return true; // 停止轮询
@@ -738,9 +804,6 @@ async function loadConfig() {
     
     // 重置按钮状态
     setFormLoading(false);
-    if (optimizeBtn) {
-      setOptimizationLoading(false);
-    }
   }
 
   function validateForm() {
@@ -780,7 +843,7 @@ async function loadConfig() {
       
       if (!allowedTypes.includes(fileExtension)) {
         isValid = false;
-        showError(`不支持的文件格式: ${fileExtension}。请选择 .srt 或 .txt 文件。`);
+        showDubbingError(`不支持的文件格式: ${fileExtension}。请选择 .srt 或 .txt 文件。`);
         return false;
       }
     }
@@ -792,14 +855,14 @@ async function loadConfig() {
         
         if (!allowedTypes.includes(fileExtension)) {
           isValid = false;
-          showError(`不支持的音频格式: ${fileExtension}。请选择 .wav 或 .mp3 文件。`);
+          showDubbingError(`不支持的音频格式: ${fileExtension}。请选择 .wav 或 .mp3 文件。`);
           return false;
         }
       }
     }
     
     if (!isValid) {
-      showError('请填写所有必填字段');
+      showDubbingError('请填写所有必填字段');
     }
     
     return isValid;
@@ -824,34 +887,179 @@ async function loadConfig() {
     resultSection.style.display = 'none';
   }
 
+  function showOptimizationStatus(title, message) {
+    optimizationStatusTitle.textContent = title;
+    optimizationStatusMessage.textContent = message;
+    optimizationProgressContainer.style.display = 'none';
+    optimizationResultSection.style.display = 'none';
+  }
+
+  function showOptimizationProgress() {
+    showOptimizationStatus('字幕优化中...', '正在处理字幕优化...');
+    optimizationProgressContainer.style.display = 'block';
+  }
+
+  function updateOptimizationProgress(progress) {
+    optimizationProgressFill.style.width = `${progress}%`;
+    optimizationProgressText.textContent = `${Math.round(progress)}%`;
+  }
+
+  function showOptimizationResult(resultUrl) {
+    const fileName = resultUrl.split('/').pop();
+    
+    // 添加CSS类来隐藏状态内容
+    optimizationStatusSection.classList.add('show-result');
+    
+    // 设置下载链接
+    optimizationDownloadLink.href = resultUrl;
+    optimizationDownloadLink.download = fileName;
+    
+    // 显示结果区域，隐藏进度条
+    optimizationResultSection.style.display = 'block';
+    optimizationProgressContainer.style.display = 'none';
+    
+    // Add success animation
+    optimizationResultSection.classList.add('success-animation');
+    setTimeout(() => {
+      optimizationResultSection.classList.remove('success-animation');
+    }, 600);
+  }
+
+  function cleanupOptimizationTask() {
+    // 清理之前的轮询interval
+    if (currentTaskInterval) {
+      clearInterval(currentTaskInterval);
+      currentTaskInterval = null;
+    }
+    
+    // 移除结果显示类
+    optimizationStatusSection.classList.remove('show-result');
+    
+    // 重置状态界面元素的显示状态
+    optimizationStatusTitle.style.display = '';
+    optimizationStatusMessage.style.display = '';
+    const statusIcon = optimizationStatusSection.querySelector('.status-icon');
+    if (statusIcon) {
+      statusIcon.style.display = '';
+    }
+    
+    // 重置进度条
+    updateOptimizationProgress(0);
+    
+    // 隐藏结果区域
+    optimizationResultSection.style.display = 'none';
+    optimizationProgressContainer.style.display = 'none';
+    
+    // 隐藏整个状态区域
+    optimizationStatusSection.style.display = 'none';
+    
+    // 重置按钮状态
+    setOptimizationLoading(false);
+  }
+
+  // Dubbing status functions
+  function showDubbingStatus(title, message) {
+    dubbingStatusTitle.textContent = title;
+    dubbingStatusMessage.textContent = message;
+    dubbingProgressContainer.style.display = 'none';
+    dubbingResultSection.style.display = 'none';
+  }
+
+  function showDubbingProgress() {
+    showDubbingStatus('配音处理中...', '正在处理配音...');
+    dubbingProgressContainer.style.display = 'block';
+  }
+
+  function updateDubbingProgress(progress) {
+    dubbingProgressFill.style.width = `${progress}%`;
+    dubbingProgressText.textContent = `${Math.round(progress)}%`;
+  }
+
+  function showDubbingResult(resultUrl) {
+    const fileName = resultUrl.split('/').pop();
+    
+    // 添加CSS类来隐藏状态内容
+    dubbingStatusSection.classList.add('show-result');
+    
+    // 设置下载链接
+    dubbingDownloadLink.href = resultUrl;
+    dubbingDownloadLink.download = fileName;
+    
+    // 显示结果区域，隐藏进度条
+    dubbingResultSection.style.display = 'block';
+    dubbingProgressContainer.style.display = 'none';
+    
+    // Add success animation
+    dubbingResultSection.classList.add('success-animation');
+    setTimeout(() => {
+      dubbingResultSection.classList.remove('success-animation');
+    }, 600);
+  }
+
+  function cleanupDubbingTask() {
+    // 清理之前的轮询interval
+    if (currentTaskInterval) {
+      clearInterval(currentTaskInterval);
+      currentTaskInterval = null;
+    }
+    
+    // 移除结果显示类
+    dubbingStatusSection.classList.remove('show-result');
+    
+    // 重置状态界面元素的显示状态
+    dubbingStatusTitle.style.display = '';
+    dubbingStatusMessage.style.display = '';
+    const statusIcon = dubbingStatusSection.querySelector('.status-icon');
+    if (statusIcon) {
+      statusIcon.style.display = '';
+    }
+    
+    // 重置进度条
+    updateDubbingProgress(0);
+    
+    // 隐藏结果区域
+    dubbingResultSection.style.display = 'none';
+    dubbingProgressContainer.style.display = 'none';
+    
+    // 隐藏整个状态区域
+    dubbingStatusSection.style.display = 'none';
+    
+    // 重置按钮状态
+    setFormLoading(false);
+  }
+
+  function showDubbingError(message) {
+    showDubbingStatus('配音失败', message);
+    dubbingProgressContainer.style.display = 'none';
+    
+    // Show error in dubbing status section
+    dubbingStatusSection.style.display = 'block';
+    
+    // Auto-hide after 8 seconds
+    setTimeout(() => {
+      if (dubbingStatusTitle.textContent === '配音失败') {
+        dubbingStatusSection.style.display = 'none';
+      }
+    }, 8000);
+  }
+
   function showProgress() {
     showStatus('处理中...', '正在上传文件并开始配音处理...');
     progressContainer.style.display = 'block';
   }
 
   function showResult(resultUrl) {
-    // 根据文件类型判断任务类型
+    // 只处理配音结果
     const fileName = resultUrl.split('/').pop();
-    const isOptimization = fileName.includes('optimized') || fileName.endsWith('.srt');
     
-    // 显示完成状态
-    if (isOptimization) {
-      statusTitle.textContent = '字幕优化完成';
-      statusMessage.textContent = '您的优化字幕文件已准备就绪，可以下载了！';
-      // 更新结果区域的文本
-      const resultTitle = resultSection.querySelector('h3');
-      const resultDesc = resultSection.querySelector('p');
-      if (resultTitle) resultTitle.textContent = '字幕优化完成！';
-      if (resultDesc) resultDesc.textContent = '您的优化字幕文件已准备就绪';
-    } else {
-      statusTitle.textContent = '配音完成';
-      statusMessage.textContent = '您的配音文件已准备就绪，可以下载了！';
-      // 恢复默认文本
-      const resultTitle = resultSection.querySelector('h3');
-      const resultDesc = resultSection.querySelector('p');
-      if (resultTitle) resultTitle.textContent = '配音完成！';
-      if (resultDesc) resultDesc.textContent = '您的配音文件已准备就绪';
-    }
+    statusTitle.textContent = '配音完成';
+    statusMessage.textContent = '您的配音文件已准备就绪，可以下载了！';
+    
+    // 更新结果区域的文本
+    const resultTitle = resultSection.querySelector('h3');
+    const resultDesc = resultSection.querySelector('p');
+    if (resultTitle) resultTitle.textContent = '配音完成！';
+    if (resultDesc) resultDesc.textContent = '您的配音文件已准备就绪';
     
     // 隐藏加载图标
     const statusIcon = document.querySelector('.status-icon');
@@ -887,6 +1095,21 @@ async function loadConfig() {
     setTimeout(() => {
       if (statusTitle.textContent === '错误') {
         statusSection.style.display = 'none';
+      }
+    }, 8000);
+  }
+
+  function showOptimizationError(message) {
+    showOptimizationStatus('优化失败', message);
+    optimizationProgressContainer.style.display = 'none';
+    
+    // Show error in optimization status section
+    optimizationStatusSection.style.display = 'block';
+    
+    // Auto-hide after 8 seconds
+    setTimeout(() => {
+      if (optimizationStatusTitle.textContent === '优化失败') {
+        optimizationStatusSection.style.display = 'none';
       }
     }, 8000);
   }
