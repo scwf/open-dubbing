@@ -86,6 +86,34 @@ class FishSpeechEngine(BaseTTSEngine):
             logger.error(f"模型加载失败: {e}")
             raise RuntimeError(f"加载Fish Speech模型失败: {e}")
 
+    def cleanup(self):
+        """清理GPU资源，释放模型内存"""
+        try:
+            # 清理模型引用
+            if hasattr(self, 'engine'):
+                del self.engine
+            if hasattr(self, 'decoder_model'):
+                del self.decoder_model
+            if hasattr(self, 'llama_queue'):
+                # 尝试关闭线程安全队列
+                if hasattr(self.llama_queue, 'close'):
+                    self.llama_queue.close()
+                del self.llama_queue
+            
+            # 强制清理CUDA缓存
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            
+            logger.info("Fish Speech引擎GPU资源已清理")
+            
+        except Exception as e:
+            logger.warning(f"清理Fish Speech引擎资源时发生错误: {e}")
+
+    def __del__(self):
+        """析构函数，确保资源被释放"""
+        self.cleanup()
+
     def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:
         """
         使用Fish Speech进行语音合成（语音克隆）

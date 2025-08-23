@@ -45,6 +45,18 @@ class F5TTSEngine(BaseTTSEngine):
             logger.error(f"模型加载失败: {e}")
             raise RuntimeError(f"加载F5TTS模型失败: {e}")
 
+    def cleanup(self):
+        """清理GPU资源"""
+        try:
+            if hasattr(self, 'tts_model'):
+                del self.tts_model
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            logger.info("F5TTS引擎GPU资源已清理")
+        except Exception as e:
+            logger.warning(f"F5TTS引擎清理时发生错误: {e}")
+
     def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:
         voice_reference = kwargs.pop('voice_reference')
         if not voice_reference:

@@ -1,6 +1,7 @@
 import inspect
 from typing import Tuple, Dict, Any, Optional
 import numpy as np
+import torch
 from .base_engine import BaseTTSEngine
 from ai_dubbing.src.config import IndexTTSConfig, AUDIO
 from ai_dubbing.src.logger import get_logger
@@ -41,6 +42,18 @@ class IndexTTSEngine(BaseTTSEngine):
         except Exception as e:
             logger.error(f"模型加载失败: {e}")
             raise RuntimeError(f"加载IndexTTS模型失败: {e}")
+
+    def cleanup(self):
+        """清理GPU资源"""
+        try:
+            if hasattr(self, 'tts_model'):
+                del self.tts_model
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            logger.info("IndexTTS引擎GPU资源已清理")
+        except Exception as e:
+            logger.warning(f"IndexTTS引擎清理时发生错误: {e}")
 
     def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:
         voice_reference = kwargs.get('voice_reference')
