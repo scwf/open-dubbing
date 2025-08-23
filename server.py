@@ -61,6 +61,13 @@ async def get_dubbing_config():
     config.read(CONFIG_FILE, encoding="utf-8")
     
     config_data = {
+        "basic": {
+            "voice_files": config.get("基本配置", "voice_files", fallback=""),
+            "prompt_texts": config.get("基本配置", "prompt_texts", fallback=""),
+            "tts_engine": config.get("基本配置", "tts_engine", fallback="fish_speech"),
+            "strategy": config.get("基本配置", "strategy", fallback="stretch"),
+            "language": config.get("高级配置", "language", fallback="zh"),
+        },
         "concurrency": {
             "tts_max_concurrency": config.getint("并发配置", "tts_max_concurrency", fallback=8),
             "tts_max_retries": config.getint("并发配置", "tts_max_retries", fallback=2),
@@ -203,6 +210,7 @@ async def create_dubbing(
     background_tasks: BackgroundTasks,
     input_file: UploadFile = File(...),
     voice_files: List[UploadFile] = File(...),
+    voice_files_paths: List[str] = Form(...),
     prompt_texts: List[str] = Form(...),
     tts_engine: str = Form(...),
     strategy: str = Form(...),
@@ -219,24 +227,25 @@ async def create_dubbing(
         f.write(await input_file.read())
 
     if optimized_srt_dir and Path(optimized_srt_dir).is_dir():
-        # This is where you would run your subtitle optimization logic
-        # and save the new SRT file.
-        # For now, we'll just log it.
         print(f"Optimized SRT would be saved in: {optimized_srt_dir}")
 
+    # Process voice files, combining new uploads and existing paths
+    final_voice_paths = []
+    for i, uploaded_file in enumerate(voice_files):
+        if uploaded_file.size > 0:
+            file_path = UPLOAD_DIR / uploaded_file.filename
+            with open(file_path, "wb") as f:
+                f.write(await uploaded_file.read())
+            final_voice_paths.append(str(file_path))
+        elif i < len(voice_files_paths) and voice_files_paths[i]:
+            path_from_config = voice_files_paths[i]
+            final_voice_paths.append(path_from_config)
 
-    if len(voice_files) != len(prompt_texts):
+    if len(final_voice_paths) != len(prompt_texts):
         raise HTTPException(
             status_code=400,
-            detail="The number of voice files and prompt texts must be the same.",
+            detail=f"Mismatch between voice files ({len(final_voice_paths)}) and prompts ({len(prompt_texts)}).",
         )
-
-    voice_paths = []
-    for vf in voice_files:
-        vp = UPLOAD_DIR / vf.filename
-        with open(vp, "wb") as f:
-            f.write(await vf.read())
-        voice_paths.append(str(vp))
 
     output_path = RESULT_DIR / f"{uuid.uuid4().hex}.wav"
 
@@ -244,7 +253,7 @@ async def create_dubbing(
         run_dubbing,
         task_id=task_id,
         input_path=input_path,
-        voice_paths=voice_paths,
+        voice_paths=final_voice_paths,
         output_path=output_path,
         tts_engine_name=tts_engine,
         strategy_name=strategy,

@@ -36,9 +36,9 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "这是一个测试中文字符密度的字幕"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        # 中文字符数量 * 0.13秒
+        # 中文字符数量 * 0.15秒 (与dubbing.conf.example默认值一致)
         chinese_chars = len(text)  # 每个字符都算
-        expected_duration = chinese_chars * 130
+        expected_duration = chinese_chars * 150
         
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
         self.assertEqual(lang_type, 'chinese')
@@ -60,7 +60,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         text = "这是一个test混合的字幕subtitle"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
         
-        expected_duration = 9 * 130 + 2 * 250
+        expected_duration = 9 * 150 + 2 * 250
         self.assertEqual(lang_type, 'mixed_cn9_en2')
         self.assertAlmostEqual(min_duration, expected_duration, places=2)
     
@@ -69,7 +69,7 @@ class TestLLMContextOptimizer(unittest.TestCase):
         # 中文字符测试
         text = "正常字幕"
         min_duration, lang_type = self.optimizer.calculate_minimum_duration(text)
-        expected = len(text) * 130
+        expected = len(text) * 150
         self.assertAlmostEqual(min_duration, expected, places=2)
         self.assertEqual(lang_type, 'chinese')
         
