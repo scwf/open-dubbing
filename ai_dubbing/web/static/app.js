@@ -523,7 +523,9 @@ async function loadConfig() {
 
   async function pollTaskStatus(taskId) {
     showProgress();
-    const interval = setInterval(async () => {
+    
+    // 定义状态检查函数
+    const checkStatus = async () => {
       try {
         const response = await fetch(`/dubbing/status/${taskId}`);
         if (!response.ok) {
@@ -531,6 +533,16 @@ async function loadConfig() {
         }
         
         const data = await response.json();
+        
+        // 只在开发模式下显示详细日志
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          console.log('任务状态更新:', { 
+            taskId, 
+            status: data.status, 
+            progress: data.progress, 
+            message: data.message 
+          });
+        }
         
         statusTitle.textContent = "处理中...";
         statusMessage.textContent = data.message || `当前进度: ${data.progress}%`;
@@ -540,18 +552,34 @@ async function loadConfig() {
           clearInterval(interval);
           showResult(data.result_url);
           setFormLoading(false);
+          return true; // 任务完成
         } else if (data.status === 'failed') {
           clearInterval(interval);
           showError(`处理失败: ${data.error || '未知错误'}`);
           setFormLoading(false);
+          return true; // 任务失败
         }
+        return false; // 继续轮询
       } catch (error) {
         console.error('Polling error:', error);
         clearInterval(interval);
         showError('无法轮询任务状态');
         setFormLoading(false);
+        return true; // 停止轮询
       }
-    }, 2000);
+    };
+    
+    // 立即执行第一次检查，避免等待轮询间隔
+    if (await checkStatus()) {
+      return; // 任务已完成或失败，无需轮询
+    }
+    
+    // 设置高频轮询以捕获快速状态变化 (500ms间隔)
+    const interval = setInterval(async () => {
+      if (await checkStatus()) {
+        clearInterval(interval);
+      }
+    }, 500);
   }
 
   function updateProgress(progress) {
