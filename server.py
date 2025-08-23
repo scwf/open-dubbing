@@ -34,7 +34,8 @@ templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/results", StaticFiles(directory=str(RESULT_DIR)), name="results")
 
-tasks = {}
+tasks = {}  # 配音任务
+optimization_tasks = {}  # 字幕优化任务
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -118,6 +119,46 @@ async def set_dubbing_config(request: Request):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         config.write(f)
     return {"status": "success"}
+
+
+def run_subtitle_optimization(
+    task_id: str,
+    input_path: Path,
+    output_path: Path,
+):
+    """Run the subtitle optimization process and update task status."""
+    try:
+        optimization_tasks[task_id] = {"status": "processing", "progress": 0, "result_url": None, "message": "初始化字幕优化..."}
+        
+        # 导入字幕优化相关模块
+        from ai_dubbing.run_optimize_subtitles import optimize_srt_file, load_config_from_file
+        
+        optimization_tasks[task_id]["progress"] = 10
+        optimization_tasks[task_id]["message"] = "加载配置文件..."
+        
+        # 加载配置
+        config = load_config_from_file()
+        if not config.get('api_key'):
+            raise ValueError("未配置LLM API密钥，请在配置中设置 llm_api_key")
+        
+        optimization_tasks[task_id]["progress"] = 30
+        optimization_tasks[task_id]["message"] = "开始字幕优化处理..."
+        
+        # 执行字幕优化
+        result_path = optimize_srt_file(str(input_path), str(output_path), config)
+        
+        if result_path:
+            optimization_tasks[task_id]["progress"] = 100
+            optimization_tasks[task_id]["status"] = "completed"
+            optimization_tasks[task_id]["result_url"] = f"/results/{Path(result_path).name}"
+            optimization_tasks[task_id]["message"] = "字幕优化完成"
+        else:
+            raise ValueError("字幕优化失败")
+            
+    except Exception as e:
+        optimization_tasks[task_id]["status"] = "failed"
+        optimization_tasks[task_id]["error"] = str(e)
+        optimization_tasks[task_id]["message"] = "字幕优化失败"
 
 
 def run_dubbing(
@@ -271,6 +312,47 @@ async def get_dubbing_status(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@app.get("/subtitle-optimization/status/{task_id}")
+async def get_optimization_status(task_id: str):
+    """Get the status of a subtitle optimization task."""
+    task = optimization_tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+@app.post("/subtitle-optimization")
+async def create_subtitle_optimization(
+    background_tasks: BackgroundTasks,
+    input_file: UploadFile = File(...),
+):
+    """Process subtitle optimization and return the optimized file."""
+    task_id = uuid.uuid4().hex
+    
+    # 检查文件类型
+    if not input_file.filename.lower().endswith('.srt'):
+        raise HTTPException(status_code=400, detail="仅支持.srt格式的字幕文件")
+    
+    # 保存上传的文件
+    input_path = UPLOAD_DIR / input_file.filename
+    with open(input_path, "wb") as f:
+        f.write(await input_file.read())
+    
+    # 生成输出文件路径
+    output_filename = f"optimized_{uuid.uuid4().hex}.srt"
+    output_path = RESULT_DIR / output_filename
+    
+    # 启动后台任务
+    background_tasks.add_task(
+        run_subtitle_optimization,
+        task_id=task_id,
+        input_path=input_path,
+        output_path=output_path,
+    )
+    
+    return {"task_id": task_id}
 
 
 @app.post("/dubbing/cleanup")

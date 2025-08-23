@@ -23,102 +23,254 @@
 
     <!-- Main Content -->
     <main class="main-content">
-      <div class="form-container">
-        <form id="dubbing-form" enctype="multipart/form-data">
-          
-          <!-- File Upload Section -->
-          <div class="upload-section">
-            <h2><i class="fas fa-file-upload"></i> 文件上传</h2>
+      <!-- Main Tabs -->
+      <div class="main-tabs">
+        <div class="main-tab-header">
+          <button type="button" class="main-tab-link active" data-tab="dubbing-tab">
+            <i class="fas fa-microphone-alt"></i>
+            <span>AI 配音</span>
+          </button>
+          <button type="button" class="main-tab-link" data-tab="optimization-tab">
+            <i class="fas fa-magic"></i>
+            <span>字幕优化</span>
+          </button>
+        </div>
+
+        <!-- Dubbing Tab -->
+        <div id="dubbing-tab" class="main-tab-content active">
+          <div class="form-container">
+            <div class="tab-intro">
+              <h2><i class="fas fa-microphone-alt"></i> AI 智能配音</h2>
+              <p>上传字幕文件和参考音频，使用AI技术生成高质量的配音文件</p>
+            </div>
             
-            <!-- SRT/TXT File Upload -->
-            <div class="upload-group">
-              <label class="upload-label">
-                <i class="fas fa-file-text"></i>
-                <span>SRT/TXT 文件</span>
-                <small>支持 .srt 和 .txt 格式</small>
-              </label>
-              <div class="file-upload-area" data-type="srt">
-                <input type="file" name="input_file" accept=".srt,.txt" required class="file-input">
-                <div class="upload-content">
-                  <i class="fas fa-cloud-upload-alt"></i>
-                  <p>点击选择文件或拖拽到此处</p>
-                  <span class="file-name">未选择文件</span>
+            <form id="dubbing-form" enctype="multipart/form-data">
+              <!-- File Upload Section -->
+              <div class="upload-section">
+                <h3><i class="fas fa-file-upload"></i> 文件上传</h3>
+                
+                <!-- SRT/TXT File Upload -->
+                <div class="upload-group">
+                  <label class="upload-label">
+                    <i class="fas fa-file-text"></i>
+                    <span>SRT/TXT 文件</span>
+                    <small>支持 .srt 和 .txt 格式</small>
+                  </label>
+                  <div class="file-upload-area" data-type="srt">
+                    <input type="file" name="input_file" accept=".srt,.txt" required class="file-input">
+                    <div class="upload-content">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                      <p>点击选择文件或拖拽到此处</p>
+                      <span class="file-name">未选择文件</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Voice Files Upload -->
+                <div id="voice-pairs-container">
+                  <!-- Voice pair template will be inserted here -->
+                </div>
+                <button type="button" id="add-voice-pair-btn" class="add-pair-btn">
+                  <i class="fas fa-plus"></i> 添加参考音频
+                </button>
+              </div>
+
+              <!-- Configuration Section -->
+              <div class="config-section">
+                <h3><i class="fas fa-cogs"></i> 配置选项</h3>
+                <!-- Options Row -->
+                <div class="options-row">
+                  <div class="form-group">
+                    <label class="form-label">
+                      <i class="fas fa-robot"></i>
+                      <span>TTS 引擎</span>
+                    </label>
+                    <select name="tts_engine" id="tts_engine" class="form-select">
+                      <option value="">加载中...</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">
+                      <i class="fas fa-chess"></i>
+                      <span>策略</span>
+                    </label>
+                    <select name="strategy" id="strategy" class="form-select">
+                      <option value="">加载中...</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">
+                      <i class="fas fa-globe"></i>
+                      <span>语言</span>
+                    </label>
+                    <select name="language" id="language" class="form-select">
+                      <option value="">加载中...</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-            </div>
+              
+              <div class="config-section">
+                <h3><i class="fas fa-cogs"></i> 高级配置</h3>
+                <div class="tabs">
+                  <div class="tab-header">
+                    <button type="button" class="tab-link active" data-tab="tab-concurrency">并发配置</button>
+                  </div>
+                  <div id="tab-concurrency" class="tab-content active">
+                    <!-- Concurrency settings will go here -->
+                  </div>
+                </div>
+                <button type="button" id="save-config-btn" class="submit-btn"><i class="fas fa-save"></i> 保存配置</button>
+              </div>
 
-            <!-- Voice Files Upload -->
-            <div id="voice-pairs-container">
-              <!-- Voice pair template will be inserted here -->
-            </div>
-            <button type="button" id="add-voice-pair-btn" class="add-pair-btn">
-              <i class="fas fa-plus"></i> 添加参考音频
-            </button>
+              <!-- Submit Button -->
+              <div class="submit-section">
+                <button type="submit" class="submit-btn" id="submit-btn">
+                  <i class="fas fa-play"></i>
+                  <span>开始配音</span>
+                </button>
+              </div>
+            </form>
           </div>
+        </div>
 
-          <!-- Configuration Section -->
-          <div class="config-section">
-            <h2><i class="fas fa-cogs"></i> 配置选项</h2>
-            <!-- Options Row -->
-            <div class="options-row">
-              <div class="form-group">
-                <label class="form-label">
-                  <i class="fas fa-robot"></i>
-                  <span>TTS 引擎</span>
-                </label>
-                <select name="tts_engine" id="tts_engine" class="form-select">
-                  <option value="">加载中...</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">
-                  <i class="fas fa-chess"></i>
-                  <span>策略</span>
-                </label>
-                <select name="strategy" id="strategy" class="form-select">
-                  <option value="">加载中...</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">
-                  <i class="fas fa-globe"></i>
-                  <span>语言</span>
-                </label>
-                <select name="language" id="language" class="form-select">
-                  <option value="">加载中...</option>
-                </select>
-              </div>
+        <!-- Optimization Tab -->
+        <div id="optimization-tab" class="main-tab-content">
+          <div class="form-container">
+            <div class="tab-intro">
+              <h2><i class="fas fa-magic"></i> 字幕优化工具</h2>
+              <p>使用 AI 智能优化字幕文本，让字幕更适合配音时长要求。建议在配音前先进行字幕优化。</p>
             </div>
+            
+            <form id="optimization-form" enctype="multipart/form-data">
+              <div class="upload-section">
+                <h3><i class="fas fa-file-upload"></i> 文件上传</h3>
+                <div class="upload-group">
+                  <label class="upload-label">
+                    <i class="fas fa-file-text"></i>
+                    <span>SRT 字幕文件</span>
+                    <small>仅支持 .srt 格式</small>
+                  </label>
+                  <div class="file-upload-area" data-type="optimization-srt">
+                    <input type="file" name="input_file" accept=".srt" required class="file-input">
+                    <div class="upload-content">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                      <p>选择需要优化的 SRT 文件</p>
+                      <span class="file-name">未选择文件</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 字幕优化配置项 -->
+              <div class="config-section">
+                <h3><i class="fas fa-cogs"></i> 字幕优化配置</h3>
+                <div class="options-row">
+                  <div class="form-group">
+                    <label class="form-label">LLM API Key</label>
+                    <div class="password-input-container">
+                      <input type="password" name="opt_llm_api_key" class="form-select" placeholder="输入您的LLM API密钥">
+                      <i class="fas fa-eye toggle-password"></i>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">LLM Model</label>
+                    <input type="text" name="opt_llm_model" class="form-select" placeholder="例如: deepseek-chat">
+                  </div>
+                </div>
+                <div class="options-row">
+                  <div class="form-group">
+                    <label class="form-label">Base URL</label>
+                    <input type="text" name="opt_base_url" class="form-select" placeholder="例如: https://api.deepseek.com">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">LLM最大并发数</label>
+                    <input type="number" name="opt_llm_max_concurrency" class="form-select" min="1" max="100" placeholder="6">
+                  </div>
+                </div>
+                <div class="options-row">
+                  <div class="form-group">
+                    <label class="form-label">中文最小字符时间 (ms)</label>
+                    <input type="number" name="opt_chinese_char_min_time" class="form-select" min="50" max="500" placeholder="130">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">英文最小单词时间 (ms)</label>
+                    <input type="number" name="opt_english_word_min_time" class="form-select" min="100" max="1000" placeholder="250">
+                  </div>
+                </div>
+                <div class="options-row">
+                  <div class="form-group">
+                    <label class="form-label">LLM最大重试次数</label>
+                    <input type="number" name="opt_llm_max_retries" class="form-select" min="1" max="10" placeholder="3">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">LLM超时 (s)</label>
+                    <input type="number" name="opt_llm_timeout" class="form-select" min="10" max="300" placeholder="60">
+                  </div>
+                </div>
+                
+                <!-- 时间借用配置 -->
+                <h4><i class="fas fa-clock"></i> 时间借用配置</h4>
+                <div class="options-row">
+                  <div class="form-group">
+                    <label class="form-label">最小保护空隙 (ms)</label>
+                    <input type="number" name="opt_min_gap_threshold" class="form-select" min="0" max="1000" placeholder="200">
+                    <small class="form-help">字幕之间的最小间隔时间</small>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">借用比例</label>
+                    <input type="number" step="0.1" name="opt_borrow_ratio" class="form-select" min="0" max="2" placeholder="1.0">
+                    <small class="form-help">从空隙中借用时间的比例</small>
+                  </div>
+                </div>
+                <div class="options-row">
+                  <div class="form-group">
+                    <label class="form-label">额外缓冲时间 (ms)</label>
+                    <input type="number" name="opt_extra_buffer" class="form-select" min="0" max="500" placeholder="200">
+                    <small class="form-help">每个字幕的额外缓冲时间</small>
+                  </div>
+                  <div class="form-group">
+                    <!-- 占位符，保持布局对齐 -->
+                  </div>
+                </div>
+              </div>
+              
+              <div class="optimization-info">
+                <h3><i class="fas fa-info-circle"></i> 优化说明</h3>
+                <div class="info-grid">
+                  <div class="info-item">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                      <h4>时长优化</h4>
+                      <p>自动调整字幕文本长度，确保符合时间轴要求</p>
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <i class="fas fa-language"></i>
+                    <div>
+                      <h4>语言优化</h4>
+                      <p>简化复杂句式，提升配音的自然度和流畅性</p>
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <i class="fas fa-brain"></i>
+                    <div>
+                      <h4>智能处理</h4>
+                      <p>基于 AI 大模型，保持原意的同时优化表达</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="submit-section">
+                <button type="submit" class="submit-btn secondary" id="optimize-btn">
+                  <i class="fas fa-magic"></i>
+                  <span>开始优化</span>
+                </button>
+              </div>
+            </form>
           </div>
-          <div class="config-section">
-            <h2><i class="fas fa-cogs"></i> 高级配置</h2>
-            <div class="tabs">
-              <div class="tab-header">
-                <button type="button" class="tab-link active" data-tab="tab-concurrency">并发配置</button>
-                <button type="button" class="tab-link" data-tab="tab-subtitle">字幕优化</button>
-                <button type="button" class="tab-link" data-tab="tab-time">时间借用</button>
-              </div>
-              <div id="tab-concurrency" class="tab-content active">
-                <!-- Concurrency settings will go here -->
-              </div>
-              <div id="tab-subtitle" class="tab-content">
-                <!-- Subtitle optimization settings will go here -->
-              </div>
-              <div id="tab-time" class="tab-content">
-                <!-- Time borrowing settings will go here -->
-              </div>
-            </div>
-            <button type="button" id="save-config-btn" class="submit-btn"><i class="fas fa-save"></i> 保存配置</button>
-          </div>
-
-          <!-- Submit Button -->
-          <div class="submit-section">
-            <button type="submit" class="submit-btn" id="submit-btn">
-              <i class="fas fa-play"></i>
-              <span>开始配音</span>
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
 
       <!-- Status Section -->
@@ -145,8 +297,8 @@
         <div class="result-section" id="result-section" style="display: none;">
           <div class="result-content">
             <i class="fas fa-check-circle success-icon"></i>
-            <h3>配音完成！</h3>
-            <p>您的配音文件已准备就绪</p>
+            <h3>处理完成！</h3>
+            <p>您的文件已准备就绪</p>
             <a href="#" id="download-link" class="download-btn" target="_blank">
               <i class="fas fa-download"></i>
               <span>下载结果</span>

@@ -9,6 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultSection = document.getElementById('result-section');
   const downloadLink = document.getElementById('download-link');
   const submitBtn = document.getElementById('submit-btn');
+
+  // Subtitle optimization elements
+  const optimizationForm = document.getElementById('optimization-form');
+  const optimizeBtn = document.getElementById('optimize-btn');
   
   const engineSelect = document.getElementById('tts_engine');
   const strategySelect = document.getElementById('strategy');
@@ -75,9 +79,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const basicConfig = await loadConfig();
     setupFileUploads();
     setupFormSubmission();
+    setupOptimizationForm();
     setupFormValidation();
     setupConfigSaving();
     setupTabs();
+    setupMainTabs();
     setupPasswordToggle();
     // Populate voice pairs with config data if available
     if (basicConfig && basicConfig.voice_files && basicConfig.prompt_texts) {
@@ -226,6 +232,42 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  function setupMainTabs() {
+    const mainTabLinks = document.querySelectorAll('.main-tab-link');
+    const mainTabContents = document.querySelectorAll('.main-tab-content');
+
+    mainTabLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        const tabId = link.dataset.tab;
+
+        // Remove active class from all main tab links and contents
+        mainTabLinks.forEach(l => l.classList.remove('active'));
+        mainTabContents.forEach(c => c.classList.remove('active'));
+
+        // Add active class to clicked link and corresponding content
+        link.classList.add('active');
+        const targetTab = document.getElementById(tabId);
+        if (targetTab) {
+          targetTab.classList.add('active');
+        }
+
+        // Log tab switch for debugging
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          console.log('切换到标签页:', tabId);
+        }
+      });
+    });
+  }
+
+  // 统一的配置加载和设置函数
+  function setConfigFieldValue(selector, value) {
+    const field = document.querySelector(selector);
+    if (field && value !== undefined && value !== null && value !== '') {
+      field.value = value;
+    }
+  }
+
 async function loadConfig() {
     try {
       const response = await fetch('/dubbing/config');
@@ -233,12 +275,36 @@ async function loadConfig() {
       
       // Set basic configuration values
       if (data.basic) {
-          if (data.basic.tts_engine) document.getElementById('tts_engine').value = data.basic.tts_engine;
-          if (data.basic.strategy) document.getElementById('strategy').value = data.basic.strategy;
-          if (data.basic.language) document.getElementById('language').value = data.basic.language;
+        setConfigFieldValue('#tts_engine', data.basic.tts_engine);
+        setConfigFieldValue('#strategy', data.basic.strategy);
       }
 
+      // Set time borrowing configuration values in optimization tab
+      if (data.time_borrowing) {
+          setTimeout(() => {
+          setConfigFieldValue('input[name="opt_min_gap_threshold"]', data.time_borrowing.min_gap_threshold);
+          setConfigFieldValue('input[name="opt_borrow_ratio"]', data.time_borrowing.borrow_ratio);
+          setConfigFieldValue('input[name="opt_extra_buffer"]', data.time_borrowing.extra_buffer);
+          }, 100);
+      }
+
+      // Set subtitle optimization configuration values in optimization tab
+      if (data.subtitle_optimization) {
+          setTimeout(() => {
+          setConfigFieldValue('input[name="opt_llm_api_key"]', data.subtitle_optimization.llm_api_key);
+          setConfigFieldValue('input[name="opt_llm_model"]', data.subtitle_optimization.llm_model);
+          setConfigFieldValue('input[name="opt_base_url"]', data.subtitle_optimization.base_url);
+          setConfigFieldValue('input[name="opt_llm_max_concurrency"]', data.subtitle_optimization.llm_max_concurrency);
+          setConfigFieldValue('input[name="opt_chinese_char_min_time"]', data.subtitle_optimization.chinese_char_min_time);
+          setConfigFieldValue('input[name="opt_english_word_min_time"]', data.subtitle_optimization.english_word_min_time);
+          setConfigFieldValue('input[name="opt_llm_max_retries"]', data.subtitle_optimization.llm_max_retries);
+          setConfigFieldValue('input[name="opt_llm_timeout"]', data.subtitle_optimization.llm_timeout);
+          }, 100);
+      }
+
+      // Populate concurrency tab content
       const concurrencyTab = document.getElementById('tab-concurrency');
+      if (concurrencyTab && data.concurrency) {
       concurrencyTab.innerHTML = `
         <div class="options-row">
           <div class="form-group">
@@ -251,69 +317,8 @@ async function loadConfig() {
           </div>
         </div>
       `;
+      }
 
-      const subtitleTab = document.getElementById('tab-subtitle');
-      subtitleTab.innerHTML = `
-        <div class="options-row">
-          <div class="form-group">
-            <label class="form-label">LLM API Key</label>
-            <div class="password-input-container">
-              <input type="password" name="llm_api_key" class="form-select" value="${data.subtitle_optimization.llm_api_key}">
-              <i class="fas fa-eye toggle-password"></i>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">LLM Model</label>
-            <input type="text" name="llm_model" class="form-select" value="${data.subtitle_optimization.llm_model}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Base URL</label>
-            <input type="text" name="base_url" class="form-select" value="${data.subtitle_optimization.base_url}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">中文最小字符时间 (ms)</label>
-            <input type="number" name="chinese_char_min_time" class="form-select" value="${data.subtitle_optimization.chinese_char_min_time}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">英文最小单词时间 (ms)</label>
-            <input type="number" name="english_word_min_time" class="form-select" value="${data.subtitle_optimization.english_word_min_time}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">LLM最大并发数</label>
-            <input type="number" name="llm_max_concurrency" class="form-select" value="${data.subtitle_optimization.llm_max_concurrency}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">LLM最大重试次数</label>
-            <input type="number" name="llm_max_retries" class="form-select" value="${data.subtitle_optimization.llm_max_retries}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">LLM超时 (s)</label>
-            <input type="number" name="llm_timeout" class="form-select" value="${data.subtitle_optimization.llm_timeout}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">优化后SRT输出目录</label>
-            <input type="text" name="optimized_srt_output_file" class="form-select" value="${data.subtitle_optimization.optimized_srt_output_file}">
-          </div>
-        </div>
-      `;
-
-      const timeTab = document.getElementById('tab-time');
-      timeTab.innerHTML = `
-        <div class="options-row">
-          <div class="form-group">
-            <label class="form-label">最小保护空隙 (ms)</label>
-            <input type="number" name="min_gap_threshold" class="form-select" value="${data.time_borrowing.min_gap_threshold}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">借用比例</label>
-            <input type="number" step="0.1" name="borrow_ratio" class="form-select" value="${data.time_borrowing.borrow_ratio}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">额外缓冲时间 (ms)</label>
-            <input type="number" name="extra_buffer" class="form-select" value="${data.time_borrowing.extra_buffer}">
-          </div>
-        </div>
-      `;
       return data.basic;
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -323,27 +328,28 @@ async function loadConfig() {
 
   function setupConfigSaving() {
     const saveBtn = document.getElementById('save-config-btn');
+    if (!saveBtn) return;
+    
     saveBtn.addEventListener('click', async () => {
       const configData = {
         concurrency: {
-          tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]').value,
-          tts_max_retries: document.querySelector('[name="tts_max_retries"]').value,
+          tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]')?.value || '',
+          tts_max_retries: document.querySelector('[name="tts_max_retries"]')?.value || '',
         },
         subtitle_optimization: {
-          llm_api_key: document.querySelector('[name="llm_api_key"]').value,
-          llm_model: document.querySelector('[name="llm_model"]').value,
-          base_url: document.querySelector('[name="base_url"]').value,
-          chinese_char_min_time: document.querySelector('[name="chinese_char_min_time"]').value,
-          english_word_min_time: document.querySelector('[name="english_word_min_time"]').value,
-          llm_max_concurrency: document.querySelector('[name="llm_max_concurrency"]').value,
-          llm_max_retries: document.querySelector('[name="llm_max_retries"]').value,
-          llm_timeout: document.querySelector('[name="llm_timeout"]').value,
-          optimized_srt_output_file: document.querySelector('[name="optimized_srt_output_file"]').value,
+          llm_api_key: document.querySelector('input[name="opt_llm_api_key"]')?.value || '',
+          llm_model: document.querySelector('input[name="opt_llm_model"]')?.value || '',
+          base_url: document.querySelector('input[name="opt_base_url"]')?.value || '',
+          chinese_char_min_time: document.querySelector('input[name="opt_chinese_char_min_time"]')?.value || '',
+          english_word_min_time: document.querySelector('input[name="opt_english_word_min_time"]')?.value || '',
+          llm_max_concurrency: document.querySelector('input[name="opt_llm_max_concurrency"]')?.value || '',
+          llm_max_retries: document.querySelector('input[name="opt_llm_max_retries"]')?.value || '',
+          llm_timeout: document.querySelector('input[name="opt_llm_timeout"]')?.value || '',
         },
         time_borrowing: {
-          min_gap_threshold: document.querySelector('[name="min_gap_threshold"]').value,
-          borrow_ratio: document.querySelector('[name="borrow_ratio"]').value,
-          extra_buffer: document.querySelector('[name="extra_buffer"]').value,
+          min_gap_threshold: document.querySelector('input[name="opt_min_gap_threshold"]')?.value || '',
+          borrow_ratio: document.querySelector('input[name="opt_borrow_ratio"]')?.value || '',
+          extra_buffer: document.querySelector('input[name="opt_extra_buffer"]')?.value || '',
         }
       };
       
@@ -449,6 +455,88 @@ async function loadConfig() {
     form.addEventListener('submit', handleFormSubmit);
   }
 
+  // Setup optimization form
+  function setupOptimizationForm() {
+    if (optimizationForm) {
+      optimizationForm.addEventListener('submit', handleOptimizationSubmit);
+      
+      // Setup file upload for optimization form
+      const optimizationArea = optimizationForm.querySelector('.file-upload-area');
+      const optimizationInput = optimizationForm.querySelector('.file-input');
+      
+      if (optimizationArea && optimizationInput) {
+        optimizationInput.addEventListener('change', (e) => handleFileSelection(e, optimizationArea, 'optimization-srt'));
+        optimizationArea.addEventListener('dragover', handleDragOver);
+        optimizationArea.addEventListener('dragleave', handleDragLeave);
+        optimizationArea.addEventListener('drop', (e) => handleDrop(e, optimizationArea, optimizationInput, 'optimization-srt'));
+        optimizationArea.addEventListener('dragenter', (e) => e.preventDefault());
+      }
+    }
+  }
+
+  async function handleOptimizationSubmit(e) {
+    e.preventDefault();
+    
+    const optimizationFile = optimizationForm.querySelector('input[name="input_file"]');
+    
+    if (!optimizationFile.files.length) {
+      showError('请选择要优化的 SRT 文件');
+      return;
+    }
+
+    // 检查文件类型
+    const file = optimizationFile.files[0];
+    if (!file.name.toLowerCase().endsWith('.srt')) {
+      showError('仅支持 .srt 格式的字幕文件');
+      return;
+    }
+
+    // 清理之前的任务状态
+    cleanupPreviousTask();
+    
+    showStatus('准备中...', '正在准备字幕优化...');
+    statusSection.style.display = 'block';
+    setOptimizationLoading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('input_file', file);
+
+      const response = await fetch('/subtitle-optimization', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`请求失败: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.task_id) {
+        pollTaskStatus(result.task_id, 'optimization');
+      } else {
+        showError('未能获取任务ID');
+      }
+      
+    } catch (error) {
+      console.error('Optimization error:', error);
+      showError(`字幕优化失败: ${error.message}`);
+      setOptimizationLoading(false);
+    }
+  }
+
+  function setOptimizationLoading(loading) {
+    if (loading) {
+      optimizeBtn.disabled = true;
+      optimizeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>优化中...</span>';
+    } else {
+      optimizeBtn.disabled = false;
+      optimizeBtn.innerHTML = '<i class="fas fa-magic"></i><span>开始优化</span>';
+    }
+  }
+
   async function handleFormSubmit(e) {
     e.preventDefault();
     
@@ -477,7 +565,7 @@ async function loadConfig() {
       }
 
       // Append advanced config inputs
-      const configInputs = document.querySelectorAll('#tab-concurrency input, #tab-subtitle input, #tab-time input');
+      const configInputs = document.querySelectorAll('#tab-concurrency input');
       configInputs.forEach(input => formData.append(input.name, input.value));
 
       // Handle voice pairs
@@ -525,13 +613,18 @@ async function loadConfig() {
     }
   }
 
-  async function pollTaskStatus(taskId) {
+  async function pollTaskStatus(taskId, taskType = 'dubbing') {
     showProgress();
+    
+    // 根据任务类型确定状态查询URL
+    const statusUrl = taskType === 'optimization' 
+      ? `/subtitle-optimization/status/${taskId}` 
+      : `/dubbing/status/${taskId}`;
     
     // 定义状态检查函数
     const checkStatus = async () => {
       try {
-        const response = await fetch(`/dubbing/status/${taskId}`);
+        const response = await fetch(statusUrl);
         if (!response.ok) {
           throw new Error('无法获取任务状态');
         }
@@ -542,13 +635,16 @@ async function loadConfig() {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           console.log('任务状态更新:', { 
             taskId, 
+            taskType,
             status: data.status, 
             progress: data.progress, 
             message: data.message 
           });
         }
         
-        statusTitle.textContent = "处理中...";
+        // 根据任务类型设置标题
+        const taskTitle = taskType === 'optimization' ? '字幕优化中...' : '配音处理中...';
+        statusTitle.textContent = taskTitle;
         statusMessage.textContent = data.message || `当前进度: ${data.progress}%`;
         updateProgress(data.progress);
         
@@ -558,7 +654,12 @@ async function loadConfig() {
             currentTaskInterval = null;
           }
           showResult(data.result_url);
-          setFormLoading(false);
+          // 根据任务类型重置对应的按钮状态
+          if (taskType === 'optimization') {
+            setOptimizationLoading(false);
+          } else {
+            setFormLoading(false);
+          }
           return true; // 任务完成
         } else if (data.status === 'failed') {
           if (currentTaskInterval) {
@@ -566,7 +667,12 @@ async function loadConfig() {
             currentTaskInterval = null;
           }
           showError(`处理失败: ${data.error || '未知错误'}`);
-          setFormLoading(false);
+          // 根据任务类型重置对应的按钮状态
+          if (taskType === 'optimization') {
+            setOptimizationLoading(false);
+          } else {
+            setFormLoading(false);
+          }
           return true; // 任务失败
         }
         return false; // 继续轮询
@@ -577,7 +683,12 @@ async function loadConfig() {
           currentTaskInterval = null;
         }
         showError('无法轮询任务状态');
-        setFormLoading(false);
+        // 根据任务类型重置对应的按钮状态
+        if (taskType === 'optimization') {
+          setOptimizationLoading(false);
+        } else {
+          setFormLoading(false);
+        }
         return true; // 停止轮询
       }
     };
@@ -624,6 +735,12 @@ async function loadConfig() {
     // 隐藏结果区域
     resultSection.style.display = 'none';
     progressContainer.style.display = 'none';
+    
+    // 重置按钮状态
+    setFormLoading(false);
+    if (optimizeBtn) {
+      setOptimizationLoading(false);
+    }
   }
 
   function validateForm() {
@@ -668,7 +785,7 @@ async function loadConfig() {
       }
     }
     
-    if (voiceInput.files.length > 0) {
+    if (voiceInput && voiceInput.files.length > 0) {
       for (let file of voiceInput.files) {
         const allowedTypes = ['.wav', '.mp3'];
         const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
@@ -713,9 +830,28 @@ async function loadConfig() {
   }
 
   function showResult(resultUrl) {
-    // 显示完成状态而不是隐藏状态元素
-    statusTitle.textContent = '配音完成';
-    statusMessage.textContent = '您的配音文件已准备就绪，可以下载了！';
+    // 根据文件类型判断任务类型
+    const fileName = resultUrl.split('/').pop();
+    const isOptimization = fileName.includes('optimized') || fileName.endsWith('.srt');
+    
+    // 显示完成状态
+    if (isOptimization) {
+      statusTitle.textContent = '字幕优化完成';
+      statusMessage.textContent = '您的优化字幕文件已准备就绪，可以下载了！';
+      // 更新结果区域的文本
+      const resultTitle = resultSection.querySelector('h3');
+      const resultDesc = resultSection.querySelector('p');
+      if (resultTitle) resultTitle.textContent = '字幕优化完成！';
+      if (resultDesc) resultDesc.textContent = '您的优化字幕文件已准备就绪';
+    } else {
+      statusTitle.textContent = '配音完成';
+      statusMessage.textContent = '您的配音文件已准备就绪，可以下载了！';
+      // 恢复默认文本
+      const resultTitle = resultSection.querySelector('h3');
+      const resultDesc = resultSection.querySelector('p');
+      if (resultTitle) resultTitle.textContent = '配音完成！';
+      if (resultDesc) resultDesc.textContent = '您的配音文件已准备就绪';
+    }
     
     // 隐藏加载图标
     const statusIcon = document.querySelector('.status-icon');
@@ -724,7 +860,7 @@ async function loadConfig() {
     }
 
     downloadLink.href = resultUrl;
-    downloadLink.download = resultUrl.split('/').pop();
+    downloadLink.download = fileName;
     resultSection.style.display = 'block';
     progressContainer.style.display = 'none';
     
@@ -755,20 +891,6 @@ async function loadConfig() {
     }, 8000);
   }
 
-  function simulateProgress() {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-      
-      progressFill.style.width = `${progress}%`;
-      progressText.textContent = `${Math.round(progress)}%`;
-    }, 200);
-  }
-
   // Add some interactive effects
   document.addEventListener('DOMContentLoaded', () => {
     // Add hover effects to form elements
@@ -785,7 +907,7 @@ async function loadConfig() {
   });
 });
 
-// Add shake animation for error fields
+// Add shake animation and error styles via CSS
 const style = document.createElement('style');
 style.textContent = `
   @keyframes shake {
