@@ -16,6 +16,11 @@ AI配音工具是一个专业的AI语音克隆配音解决方案，通过先进�
 
 ```
 open-dubbing/
+├── run.sh                     # 一键部署启动脚本（Fish Speech）
+├── install.sh                 # Fish Speech 环境安装脚本
+├── install-index-tts.sh       # IndexTTS 环境安装脚本
+├── install-f5-tts.sh          # F5-TTS 环境安装脚本
+├── install-cosyvoice.sh       # CosyVoice 环境安装脚本
 ├── server.py                  # Web UI 服务启动脚本
 ├── requirements.txt           # Python 依赖包
 ├── ai_dubbing/
@@ -52,13 +57,77 @@ open-dubbing/
 └── README.md                  # 说明文档
 ```
 
-## 🛠️ 环境配置
+## 🚀 快速开始
 
-环境安装和配置请参考 [INSTALL.md](INSTALL.md) 文件。
+### 一键部署启动（推荐）
+
+项目提供了 `run.sh` 一键部署脚本，可以自动完成环境配置、依赖安装、模型下载和服务启动：
+
+```bash
+./run.sh
+```
+
+**脚本功能：**
+- 🔧 自动创建和激活 `fish-speech` Conda 环境
+- 📦 安装所有必需的依赖包（包括 FFmpeg、PyTorch 等）
+- 🔗 克隆和安装 Fish Speech 引擎
+- 📥 下载预训练模型（openaudio-s1-mini）
+- ⚙️ 自动生成配置文件
+- 🌐 启动 Web UI 服务器
+
+执行完成后，服务将在 `http://127.0.0.1:8000` 运行，您可以直接在浏览器中开始使用。
+
+### 手动环境配置
+
+项目为每个 TTS 引擎提供了独立的安装脚本，您可以根据需要选择安装：
+
+#### Fish Speech 引擎（推荐）
+```bash
+./install.sh
+# 或者使用具体的脚本名
+./install-fish-speech.sh
+```
+
+#### IndexTTS 引擎
+```bash
+./install-index-tts.sh
+```
+
+#### F5-TTS 引擎
+```bash
+./install-f5-tts.sh
+```
+
+#### CosyVoice 引擎
+```bash
+./install-cosyvoice.sh
+```
+
+**安装后启动服务：**
+
+每个 TTS 引擎使用独立的 conda 环境，激活对应环境后启动服务：
+
+```bash
+# Fish Speech 引擎
+conda activate fish-speech
+python server.py
+
+# IndexTTS 引擎  
+conda activate index-tts
+python server.py
+
+# F5-TTS 引擎
+conda activate f5-tts
+python server.py
+
+# CosyVoice 引擎
+conda activate cosyvoice
+python server.py
+```
+
+> **注意**：在 Web UI 中记得将 TTS 引擎设置为对应的引擎类型（`fish_speech`、`index_tts`、`f5_tts`、`cosy_voice`）。
 
 ## 📝 使用说明
-
-支持两种使用方式：**配置文件方式**（推荐）和**命令行参数方式**。另外，项目还提供一个简单的 Web 界面方便快速体验配音流程。
 
 ### 💻 Web UI 交互界面
 
