@@ -3,6 +3,7 @@ from typing import Dict, Type, Any
 
 from .base_engine import BaseTTSEngine
 from .index_tts_engine import IndexTTSEngine
+from .index_tts2_engine import IndexTTS2Engine
 # 当你添加新引擎时，在这里导入
 from .f5_tts_engine import F5TTSEngine
 from .cosy_voice_engine import CosyVoiceEngine
@@ -11,6 +12,7 @@ from .fish_speech_engine import FishSpeechEngine
 # 引擎注册表
 TTS_ENGINES: Dict[str, Type['BaseTTSEngine']] = {
     "index_tts": IndexTTSEngine,
+    "index_tts2": IndexTTS2Engine,
     "f5_tts": F5TTSEngine,
     "cosy_voice": CosyVoiceEngine,
     "fish_speech": FishSpeechEngine,

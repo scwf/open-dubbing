@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupOptimizationForm();
     setupFormValidation();
     setupTabs();
+    setupIndexTTS2Controls();
     setupMainTabs();
     setupPasswordToggle();
     // Populate voice pairs with config data if available
@@ -243,11 +244,20 @@ document.addEventListener('DOMContentLoaded', () => {
       link.addEventListener('click', () => {
         const tabId = link.dataset.tab;
 
+        // 移除所有标签页的active状态
         tabLinks.forEach(l => l.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
+        tabContents.forEach(c => {
+          c.classList.remove('active');
+          c.style.display = 'none'; // 确保隐藏
+        });
 
+        // 激活当前标签页
         link.classList.add('active');
-        document.getElementById(tabId).classList.add('active');
+        const targetContent = document.getElementById(tabId);
+        if (targetContent) {
+          targetContent.classList.add('active');
+          targetContent.style.display = 'block'; // 确保显示
+        }
       });
     });
   }
@@ -347,7 +357,7 @@ async function loadConfig() {
 
   // Get form configuration data for saving
   function getFormConfig() {
-    return {
+    const config = {
       concurrency: {
         tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]')?.value || '',
         tts_max_retries: document.querySelector('[name="tts_max_retries"]')?.value || '',
@@ -368,6 +378,20 @@ async function loadConfig() {
         extra_buffer: document.querySelector('input[name="opt_extra_buffer"]')?.value || '',
       }
     };
+
+    // Add IndexTTS2 emotion control parameters if IndexTTS2 is selected
+    const selectedEngine = document.getElementById('tts_engine')?.value;
+    if (selectedEngine === 'index_tts2') {
+      config.index_tts2_emotion = {
+        emotion_mode: document.getElementById('emotion_mode')?.value || 'auto',
+        emotion_vector: document.getElementById('emotion_vector')?.value || '',
+        emotion_text: document.getElementById('emotion_text')?.value || '',
+        emotion_alpha: document.getElementById('emotion_alpha')?.value || '0.8',
+        use_random: document.getElementById('use_random')?.checked || false,
+      };
+    }
+
+    return config;
   }
 
   // Setup file upload functionality
@@ -623,6 +647,46 @@ async function loadConfig() {
       // Append advanced config inputs
       const configInputs = document.querySelectorAll('#tab-concurrency input');
       configInputs.forEach(input => formData.append(input.name, input.value));
+
+      // Append IndexTTS2 emotion control parameters (only if IndexTTS2 is selected)
+      const selectedEngine = document.getElementById('tts_engine').value;
+      if (selectedEngine === 'index_tts2') {
+        // Emotion mode
+        const emotionMode = document.getElementById('emotion_mode');
+        if (emotionMode) {
+          formData.append('emotion_mode', emotionMode.value);
+        }
+
+        // Emotion audio file
+        const emotionAudioFile = document.getElementById('emotion_audio_file');
+        if (emotionAudioFile && emotionAudioFile.files.length > 0) {
+          formData.append('emotion_audio_file', emotionAudioFile.files[0]);
+        }
+
+        // Emotion vector
+        const emotionVector = document.getElementById('emotion_vector');
+        if (emotionVector && emotionVector.value.trim()) {
+          formData.append('emotion_vector', emotionVector.value.trim());
+        }
+
+        // Emotion text
+        const emotionText = document.getElementById('emotion_text');
+        if (emotionText && emotionText.value.trim()) {
+          formData.append('emotion_text', emotionText.value.trim());
+        }
+
+        // Emotion alpha
+        const emotionAlpha = document.getElementById('emotion_alpha');
+        if (emotionAlpha) {
+          formData.append('emotion_alpha', emotionAlpha.value);
+        }
+
+        // Use random
+        const useRandom = document.getElementById('use_random');
+        if (useRandom) {
+          formData.append('use_random', useRandom.checked);
+        }
+      }
 
       // Handle voice pairs
       const voicePairs = document.querySelectorAll('.voice-pair');
@@ -1145,3 +1209,131 @@ style.textContent = `
   }
 `;
 document.head.appendChild(style);
+
+// IndexTTS2 Emotion Control Functions
+function setupIndexTTS2Controls() {
+  const engineSelect = document.getElementById('tts_engine');
+  const emotionModeSelect = document.getElementById('emotion_mode');
+  const emotionAlphaSlider = document.getElementById('emotion_alpha');
+  const emotionAlphaValue = document.getElementById('emotion-alpha-value');
+
+  if (!engineSelect) {
+    console.error('TTS引擎选择器未找到');
+    return;
+  }
+
+  // 监听TTS引擎变化
+  engineSelect.addEventListener('change', function() {
+    toggleEmotionControls(this.value);
+  });
+
+  // 监听情感模式变化
+  if (emotionModeSelect) {
+    emotionModeSelect.addEventListener('change', function() {
+      toggleEmotionSections(this.value);
+    });
+  }
+
+  // 监听情感强度滑块变化
+  if (emotionAlphaSlider && emotionAlphaValue) {
+    emotionAlphaSlider.addEventListener('input', function() {
+      emotionAlphaValue.textContent = this.value;
+    });
+  }
+
+  // 初始化时检查当前引擎
+  toggleEmotionControls(engineSelect.value);
+  if (emotionModeSelect) {
+    toggleEmotionSections(emotionModeSelect.value);
+  }
+}
+
+function toggleEmotionControls(engineValue) {
+  const emotionTab = document.getElementById('tab-emotion-btn');
+  const emotionTabContent = document.getElementById('tab-emotion');
+  
+  if (engineValue === 'index_tts2') {
+    // 显示IndexTTS2情感控制标签页
+    if (emotionTab) {
+      emotionTab.style.setProperty('display', 'inline-block', 'important');
+      emotionTab.style.setProperty('visibility', 'visible', 'important');
+      emotionTab.style.setProperty('opacity', '1', 'important');
+      
+      // 移除任何可能覆盖默认样式的强制样式
+      emotionTab.style.removeProperty('background-color');
+      emotionTab.style.removeProperty('color');
+      emotionTab.style.removeProperty('border');
+      emotionTab.style.removeProperty('border-radius');
+      emotionTab.style.removeProperty('padding');
+      emotionTab.style.removeProperty('margin-left');
+      emotionTab.style.removeProperty('font-weight');
+      emotionTab.style.removeProperty('cursor');
+      emotionTab.style.removeProperty('transition');
+      
+      // 移除可能的hidden类
+      emotionTab.classList.remove('hidden');
+    }
+  } else {
+    // 隐藏IndexTTS2情感控制标签页
+    if (emotionTab) {
+      emotionTab.style.setProperty('display', 'none', 'important');
+    }
+    if (emotionTabContent) {
+      emotionTabContent.style.setProperty('display', 'none', 'important');
+    }
+    
+    // 如果当前在情感控制标签页，切换到并发配置标签页
+    if (emotionTabContent.style.display !== 'none') {
+      const concurrencyTab = document.querySelector('[data-tab="tab-concurrency"]');
+      const concurrencyTabContent = document.getElementById('tab-concurrency');
+      
+      // 切换标签页状态
+      document.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+      
+      concurrencyTab.classList.add('active');
+      concurrencyTabContent.style.display = 'block';
+    }
+    
+    // 重置情感控制参数为默认值
+    resetEmotionControls();
+  }
+}
+
+function toggleEmotionSections(emotionMode) {
+  // 隐藏所有情感配置区域
+  const emotionSections = document.querySelectorAll('.emotion-section');
+  emotionSections.forEach(section => {
+    section.style.display = 'none';
+  });
+
+  // 根据模式显示对应的配置区域
+  switch(emotionMode) {
+    case 'audio':
+      document.getElementById('emotion-audio-section').style.display = 'block';
+      break;
+    case 'vector':
+      document.getElementById('emotion-vector-section').style.display = 'block';
+      break;
+    case 'text':
+      document.getElementById('emotion-text-section').style.display = 'block';
+      break;
+    case 'auto':
+      // 自动模式不需要额外配置
+      break;
+  }
+}
+
+function resetEmotionControls() {
+  // 重置所有情感控制参数为默认值
+  document.getElementById('emotion_mode').value = 'auto';
+  document.getElementById('emotion_audio_file').value = '';
+  document.getElementById('emotion_vector').value = '';
+  document.getElementById('emotion_text').value = '';
+  document.getElementById('emotion_alpha').value = '0.8';
+  document.getElementById('emotion-alpha-value').textContent = '0.8';
+  document.getElementById('use_random').checked = false;
+  
+  // 隐藏所有情感配置区域
+  toggleEmotionSections('auto');
+}

@@ -117,9 +117,85 @@
                 <div class="tabs">
                   <div class="tab-header">
                     <button type="button" class="tab-link active" data-tab="tab-concurrency">并发配置</button>
+                    <button type="button" class="tab-link" data-tab="tab-emotion" id="tab-emotion-btn" style="display: none;">IndexTTS2情感控制</button>
                   </div>
                   <div id="tab-concurrency" class="tab-content active">
                     <!-- Concurrency settings will go here -->
+                  </div>
+                  <div id="tab-emotion" class="tab-content">
+                    <!-- IndexTTS2 Emotion Control Panel -->
+                    <div class="emotion-control-panel">
+                      <div class="form-group">
+                        <label class="form-label">
+                          <i class="fas fa-heart"></i>
+                          <span>情感控制模式</span>
+                        </label>
+                        <select name="emotion_mode" id="emotion_mode" class="form-select">
+                          <option value="auto">自动检测</option>
+                          <option value="audio">音频引导</option>
+                          <option value="vector">向量控制</option>
+                          <option value="text">文本描述</option>
+                        </select>
+                      </div>
+
+                      <!-- 音频引导模式 -->
+                      <div id="emotion-audio-section" class="emotion-section" style="display: none;">
+                        <div class="form-group">
+                          <label class="form-label">
+                            <i class="fas fa-music"></i>
+                            <span>情感参考音频</span>
+                          </label>
+                          <input type="file" name="emotion_audio_file" id="emotion_audio_file" class="form-input" accept=".wav,.mp3">
+                          <small class="form-hint">上传包含目标情感的音频文件</small>
+                        </div>
+                      </div>
+
+                      <!-- 向量控制模式 -->
+                      <div id="emotion-vector-section" class="emotion-section" style="display: none;">
+                        <div class="form-group">
+                          <label class="form-label">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>情感向量 (开心,愤怒,悲伤,恐惧,厌恶,忧郁,惊讶,平静)</span>
+                          </label>
+                          <input type="text" name="emotion_vector" id="emotion_vector" class="form-input" 
+                                 placeholder="例如: 0.5,0,0,0,0,0,0.8,0">
+                          <small class="form-hint">8个浮点数(0.0-1.0)，用逗号分隔</small>
+                        </div>
+                      </div>
+
+                      <!-- 文本描述模式 -->
+                      <div id="emotion-text-section" class="emotion-section" style="display: none;">
+                        <div class="form-group">
+                          <label class="form-label">
+                            <i class="fas fa-comment"></i>
+                            <span>情感描述</span>
+                          </label>
+                          <textarea name="emotion_text" id="emotion_text" class="form-textarea" rows="2"
+                                    placeholder="例如: 很开心很惊讶的语气"></textarea>
+                          <small class="form-hint">用自然语言描述期望的情感表达</small>
+                        </div>
+                      </div>
+
+                      <!-- 通用控制参数 -->
+                      <div class="form-group">
+                        <label class="form-label">
+                          <i class="fas fa-sliders-h"></i>
+                          <span>情感强度: <span id="emotion-alpha-value">0.8</span></span>
+                        </label>
+                        <input type="range" name="emotion_alpha" id="emotion_alpha" class="form-range" 
+                               min="0" max="1" step="0.1" value="0.8">
+                        <small class="form-hint">控制情感表达的强烈程度 (0.0-1.0)</small>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-checkbox">
+                          <input type="checkbox" name="use_random" id="use_random">
+                          <span class="checkmark"></span>
+                          <span>使用随机采样</span>
+                        </label>
+                        <small class="form-hint">启用可增加语音多样性，但可能影响语音克隆准确度</small>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
