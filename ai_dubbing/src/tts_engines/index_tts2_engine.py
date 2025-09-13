@@ -106,7 +106,7 @@ class IndexTTS2Engine(BaseTTSEngine):
         # 优雅地过滤出底层模型支持的参数
         filtered_kwargs = {
             key: value for key, value in inference_kwargs.items() 
-            if key in self.valid_infer_params and value is not None
+            if key in self.valid_infer_params
         }
         
         logger.debug(f"IndexTTS2推理参数: {filtered_kwargs}")

@@ -88,6 +88,14 @@ async def get_dubbing_config():
             "min_gap_threshold": config.getint("时间借用配置", "min_gap_threshold", fallback=200),
             "borrow_ratio": config.getfloat("时间借用配置", "borrow_ratio", fallback=1.0),
             "extra_buffer": config.getint("时间借用配置", "extra_buffer", fallback=200),
+        },
+        "index_tts2_emotion": {
+            "emotion_mode": config.get("IndexTTS2情感控制", "emotion_mode", fallback="auto"),
+            "emotion_audio_file": config.get("IndexTTS2情感控制", "emotion_audio_file", fallback=""),
+            "emotion_vector": config.get("IndexTTS2情感控制", "emotion_vector", fallback=""),
+            "emotion_text": config.get("IndexTTS2情感控制", "emotion_text", fallback=""),
+            "emotion_alpha": config.getfloat("IndexTTS2情感控制", "emotion_alpha", fallback=0.8),
+            "use_random": config.getboolean("IndexTTS2情感控制", "use_random", fallback=False),
         }
     }
     return config_data
@@ -170,6 +178,7 @@ def run_dubbing(
     strategy_name: str,
     language: str = "zh",
     prompt_texts: List[str] | None = None,
+    emotion_config: dict = None,
 ):
     """Run the dubbing process and update task status."""
     try:
@@ -223,6 +232,10 @@ def run_dubbing(
             "max_retries": max_retries,
             "progress_callback": progress_callback,
         }
+        
+        # 添加IndexTTS2情感控制参数
+        if emotion_config:
+            runtime_kwargs.update(emotion_config)
         audio_segments = strategy_instance.process_entries(
             entries, voice_reference=voice_paths[0], **runtime_kwargs
         )
@@ -256,6 +269,13 @@ async def create_dubbing(
     tts_engine: str = Form(...),
     strategy: str = Form(...),
     language: str = Form("zh"),
+    # IndexTTS2情感控制参数 (可选)
+    emotion_mode: str = Form("auto"),
+    emotion_audio_file: UploadFile = File(None),
+    emotion_vector: str = Form(""),
+    emotion_text: str = Form(""),
+    emotion_alpha: float = Form(0.8),
+    use_random: bool = Form(False),
 ):
     """Process an upload and return the generated audio path."""
     task_id = uuid.uuid4().hex
@@ -288,6 +308,31 @@ async def create_dubbing(
             detail=f"Mismatch between voice files ({len(final_voice_paths)}) and prompts ({len(prompt_texts)}).",
         )
 
+    # 处理IndexTTS2情感音频文件
+    emotion_audio_path = None
+    if tts_engine == "index_tts2" and emotion_mode == "audio" and emotion_audio_file and emotion_audio_file.size > 0:
+        emotion_audio_path = UPLOAD_DIR / f"emotion_{uuid.uuid4().hex}_{emotion_audio_file.filename}"
+        with open(emotion_audio_path, "wb") as f:
+            f.write(await emotion_audio_file.read())
+
+    # 构建情感配置参数
+    emotion_config = {}
+    if tts_engine == "index_tts2":
+        if emotion_mode == "audio" and emotion_audio_path:
+            emotion_config["emotion_audio_file"] = str(emotion_audio_path)
+        elif emotion_mode == "vector" and emotion_vector:
+            try:
+                emotion_config["emotion_vector"] = [float(x.strip()) for x in emotion_vector.split(',')]
+            except ValueError:
+                pass  # 忽略格式错误，使用默认值
+        elif emotion_mode == "text" and emotion_text:
+            emotion_config["emotion_text"] = emotion_text
+        elif emotion_mode == "auto":
+            emotion_config["auto_emotion"] = True
+        
+        emotion_config["emotion_alpha"] = emotion_alpha
+        emotion_config["use_random"] = use_random
+
     output_path = RESULT_DIR / f"{uuid.uuid4().hex}.wav"
 
     background_tasks.add_task(
@@ -300,6 +345,7 @@ async def create_dubbing(
         strategy_name=strategy,
         language=language,
         prompt_texts=prompt_texts,
+        emotion_config=emotion_config,
     )
 
     return {"task_id": task_id}
