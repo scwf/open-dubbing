@@ -94,6 +94,44 @@ class IndexTTSConfig:
         }
 
 
+class IndexTTS2Config:
+    """IndexTTS2引擎专用配置"""
+    # IndexTTS2模型路径 - 根据index2.md，默认是checkpoints目录
+    MODEL_DIR = str(MODEL_CACHE_DIR / "IndexTTS-2")
+    CONFIG_FILE = str(MODEL_CACHE_DIR / "IndexTTS-2" / "config.yaml")
+    SOURCE_DIR = str(Path(os.getenv('INDEX_TTS_DIR', str(PROJECT_ROOT / 'index-tts'))))
+    
+    # IndexTTS2特有的性能配置
+    USE_FP16 = True
+    USE_CUDA_KERNEL = False  # 默认关闭，用户可根据需要开启
+    USE_DEEPSPEED = False    # 默认关闭，用户可根据需要开启
+    
+    # 情感控制默认配置
+    DEFAULT_EMO_ALPHA = 1.0
+    DEFAULT_USE_RANDOM = False
+    DEFAULT_USE_EMO_TEXT = False
+    
+    @classmethod
+    def get_init_kwargs(cls) -> Dict[str, Any]:
+        """获取用于IndexTTS2初始化的字典"""
+        return {
+            "cfg_path": cls.CONFIG_FILE,
+            "model_dir": cls.MODEL_DIR,
+            "use_fp16": cls.USE_FP16,
+            "use_cuda_kernel": cls.USE_CUDA_KERNEL,
+            "use_deepspeed": cls.USE_DEEPSPEED,
+        }
+    
+    @classmethod
+    def get_inference_kwargs(cls) -> Dict[str, Any]:
+        """获取IndexTTS2推理的默认参数字典"""
+        return {
+            "emo_alpha": cls.DEFAULT_EMO_ALPHA,
+            "use_random": cls.DEFAULT_USE_RANDOM,
+            "use_emo_text": cls.DEFAULT_USE_EMO_TEXT,
+        }
+
+
 class F5TTSConfig:
     """F5TTS引擎相关配置"""
     # 参数源自 F5TTS_infer.md
@@ -229,6 +267,7 @@ CONFIG = {
     'audio': AudioConfig,
     'strategy': StrategyConfig,
     'model': IndexTTSConfig,
+    'index_tts2': IndexTTS2Config,
     'f5_tts': F5TTSConfig,
     'cosy_voice': CosyVoiceConfig,
     'fish_speech': FishSpeechConfig,

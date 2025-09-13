@@ -108,6 +108,84 @@ def get_multi_voice_config(config):
     
     return voice_files, prompt_texts
 
+def get_emotion_config(config):
+    """
+    获取IndexTTS2情感控制配置
+    
+    Args:
+        config: configparser.ConfigParser对象
+    
+    Returns:
+        dict: 情感控制参数字典
+    """
+    SECTION_NAME = 'IndexTTS2情感控制'
+    
+    # 情感模式处理器映射
+    mode_handlers = {
+        'audio': _handle_audio_emotion,
+        'vector': _handle_vector_emotion,
+        'text': _handle_text_emotion,
+        'auto': _handle_auto_emotion,
+    }
+    
+    emotion_config = {}
+    emotion_mode = get_config_value(config, SECTION_NAME, 'emotion_mode', 'auto')
+    
+    # 处理特定情感模式
+    handler = mode_handlers.get(emotion_mode)
+    if handler:
+        emotion_config.update(handler(config, SECTION_NAME))
+    
+    # 添加通用参数
+    emotion_config.update(_get_common_emotion_params(config, SECTION_NAME))
+    
+    return emotion_config
+
+def _handle_audio_emotion(config, section_name):
+    """处理音频引导模式"""
+    emotion_audio_file = get_config_value(config, section_name, 'emotion_audio_file')
+    return {'emotion_audio_file': emotion_audio_file.strip()} if emotion_audio_file and emotion_audio_file.strip() else {}
+
+def _handle_vector_emotion(config, section_name):
+    """处理情感向量模式"""
+    emotion_vector_str = get_config_value(config, section_name, 'emotion_vector')
+    if not emotion_vector_str or not emotion_vector_str.strip():
+        return {}
+    
+    try:
+        emotion_vector = [float(x.strip()) for x in emotion_vector_str.split(',')]
+        if len(emotion_vector) == 8:
+            return {'emotion_vector': emotion_vector}
+        else:
+            print(f"警告：情感向量必须包含8个数值，当前有{len(emotion_vector)}个")
+    except ValueError as e:
+        print(f"警告：情感向量格式错误: {e}")
+    
+    return {}
+
+def _handle_text_emotion(config, section_name):
+    """处理文本描述模式"""
+    emotion_text = get_config_value(config, section_name, 'emotion_text')
+    return {'emotion_text': emotion_text.strip()} if emotion_text and emotion_text.strip() else {}
+
+def _handle_auto_emotion(config, section_name):
+    """处理自动检测模式"""
+    return {'auto_emotion': True}
+
+def _get_common_emotion_params(config, section_name):
+    """获取通用情感参数"""
+    emotion_alpha = get_config_value(config, section_name, 'emotion_alpha', 0.8, float)
+    
+    # 验证情感强度范围
+    if not (0.0 <= emotion_alpha <= 1.0):
+        print(f"警告：情感强度超出范围[0.0, 1.0]，使用默认值0.8，当前值: {emotion_alpha}")
+        emotion_alpha = 0.8
+    
+    return {
+        'emotion_alpha': emotion_alpha,
+        'use_random': get_config_value(config, section_name, 'use_random', False, bool)
+    }
+
 def main():
     """主函数：完全遵循cli.py的精确结构和逻辑"""
     
@@ -117,7 +195,7 @@ def main():
     # 解析配置参数（映射到cli.py的参数）
     input_file = get_config_value(config, '基本配置', 'input_file')
     output_file = get_config_value(config, '基本配置', 'output_file', PATH.get_default_output_path())
-    tts_engine_name = get_config_value(config, '基本配置', 'tts_engine', 'index_tts')
+    tts_engine_name = get_config_value(config, '基本配置', 'tts_engine', 'fish_speech')
     strategy_name = get_config_value(config, '基本配置', 'strategy', 'stretch')
     lang = get_config_value(config, '高级配置', 'language', 'zh')
     # 并发配置（供策略并行合成使用）
@@ -126,6 +204,13 @@ def main():
     
     # 解析多对参考音频配置
     voice_files, prompt_texts = get_multi_voice_config(config)
+    
+    # 获取情感控制配置（仅当使用IndexTTS2时）
+    emotion_config = {}
+    if tts_engine_name == 'index_tts2':
+        emotion_config = get_emotion_config(config)
+        if emotion_config:
+            logger.info(f"IndexTTS2情感控制配置: {emotion_config}")
     
     # --- 初始化 ---
     start_time = time.time()
@@ -210,6 +295,8 @@ def main():
             # 并发相关参数：由基础策略读取并控制
             "max_concurrency": tts_max_concurrency,
             "max_retries": tts_max_retries,
+            # IndexTTS2情感控制参数
+            **emotion_config
         }
         
         audio_segments = strategy_instance.process_entries(

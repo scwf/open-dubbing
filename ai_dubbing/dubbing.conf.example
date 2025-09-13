@@ -20,7 +20,7 @@ prompt_texts = "这是第一段参考音频的文本", "这是第二段参考音
 # 输出音频文件路径（默认：output.wav）
 output_file = /path/to/output.wav
 
-# TTS引擎选择：fish_speech, index_tts, f5_tts, cosy_voice
+# TTS引擎选择：fish_speech, index_tts, index_tts2, f5_tts, cosy_voice
 tts_engine = fish_speech
 
 # 时间同步策略：stretch, basic
@@ -62,4 +62,30 @@ min_gap_threshold = 200
 borrow_ratio = 1
 # 额外缓冲时间（毫秒），在计算需要延长时间时的安全余量
 extra_buffer = 200
+
+[IndexTTS2情感控制]
+# IndexTTS2专用情感控制配置 (仅当tts_engine=index_tts2时生效)
+# 情感控制模式：auto(自动检测), audio(音频引导), vector(向量控制), text(文本描述)
+emotion_mode = auto
+
+# 情感音频文件路径 (emotion_mode=audio时使用)
+# 指定一个包含目标情感的音频文件，用于引导情感表达
+# emotion_audio_file = /path/to/emotional_reference.wav
+
+# 情感向量 (emotion_mode=vector时使用)
+# 8个浮点数，分别对应：开心,愤怒,悲伤,恐惧,厌恶,忧郁,惊讶,平静
+# 数值范围0.0-1.0，可以组合使用（如开心+惊讶）
+# emotion_vector = 0.5,0,0,0,0,0,0.8,0
+
+# 情感描述文本 (emotion_mode=text时使用)
+# 用自然语言描述期望的情感表达效果
+# emotion_text = 很开心很惊讶的语气
+
+# 情感强度控制 (0.0-1.0)
+# 控制情感表达的强烈程度，建议0.6-0.8，1.0为最强烈
+emotion_alpha = 0.8
+
+# 是否使用随机采样 (true/false)
+# 启用可增加语音多样性，但可能影响语音克隆的准确度
+use_random = false
 
