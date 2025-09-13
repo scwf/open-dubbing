@@ -205,6 +205,13 @@ def main():
     # 解析多对参考音频配置
     voice_files, prompt_texts = get_multi_voice_config(config)
     
+    # --- 初始化 ---
+    start_time = time.time()
+    setup_logging("INFO")
+    
+    # 创建logger
+    logger = get_logger()
+    
     # 获取情感控制配置（仅当使用IndexTTS2时）
     emotion_config = {}
     if tts_engine_name == 'index_tts2':
@@ -212,12 +219,7 @@ def main():
         if emotion_config:
             logger.info(f"IndexTTS2情感控制配置: {emotion_config}")
     
-    # --- 初始化 ---
-    start_time = time.time()
-    setup_logging("INFO")
-    
-    # 创建logger并打印每一对参考音频和文本配置
-    logger = get_logger()
+    # 打印每一对参考音频和文本配置
     logger.info(f"配置了 {len(voice_files)} 对参考音频和文本:")
     for i, (voice_file, prompt_text) in enumerate(zip(voice_files, prompt_texts), 1):
         logger.info(f"  {i}. 音频: {voice_file}")

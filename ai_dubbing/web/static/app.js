@@ -357,7 +357,7 @@ async function loadConfig() {
 
   // Get form configuration data for saving
   function getFormConfig() {
-    return {
+    const config = {
       concurrency: {
         tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]')?.value || '',
         tts_max_retries: document.querySelector('[name="tts_max_retries"]')?.value || '',
@@ -378,6 +378,20 @@ async function loadConfig() {
         extra_buffer: document.querySelector('input[name="opt_extra_buffer"]')?.value || '',
       }
     };
+
+    // Add IndexTTS2 emotion control parameters if IndexTTS2 is selected
+    const selectedEngine = document.getElementById('tts_engine')?.value;
+    if (selectedEngine === 'index_tts2') {
+      config.index_tts2_emotion = {
+        emotion_mode: document.getElementById('emotion_mode')?.value || 'auto',
+        emotion_vector: document.getElementById('emotion_vector')?.value || '',
+        emotion_text: document.getElementById('emotion_text')?.value || '',
+        emotion_alpha: document.getElementById('emotion_alpha')?.value || '0.8',
+        use_random: document.getElementById('use_random')?.checked || false,
+      };
+    }
+
+    return config;
   }
 
   // Setup file upload functionality
@@ -633,6 +647,46 @@ async function loadConfig() {
       // Append advanced config inputs
       const configInputs = document.querySelectorAll('#tab-concurrency input');
       configInputs.forEach(input => formData.append(input.name, input.value));
+
+      // Append IndexTTS2 emotion control parameters (only if IndexTTS2 is selected)
+      const selectedEngine = document.getElementById('tts_engine').value;
+      if (selectedEngine === 'index_tts2') {
+        // Emotion mode
+        const emotionMode = document.getElementById('emotion_mode');
+        if (emotionMode) {
+          formData.append('emotion_mode', emotionMode.value);
+        }
+
+        // Emotion audio file
+        const emotionAudioFile = document.getElementById('emotion_audio_file');
+        if (emotionAudioFile && emotionAudioFile.files.length > 0) {
+          formData.append('emotion_audio_file', emotionAudioFile.files[0]);
+        }
+
+        // Emotion vector
+        const emotionVector = document.getElementById('emotion_vector');
+        if (emotionVector && emotionVector.value.trim()) {
+          formData.append('emotion_vector', emotionVector.value.trim());
+        }
+
+        // Emotion text
+        const emotionText = document.getElementById('emotion_text');
+        if (emotionText && emotionText.value.trim()) {
+          formData.append('emotion_text', emotionText.value.trim());
+        }
+
+        // Emotion alpha
+        const emotionAlpha = document.getElementById('emotion_alpha');
+        if (emotionAlpha) {
+          formData.append('emotion_alpha', emotionAlpha.value);
+        }
+
+        // Use random
+        const useRandom = document.getElementById('use_random');
+        if (useRandom) {
+          formData.append('use_random', useRandom.checked);
+        }
+      }
 
       // Handle voice pairs
       const voicePairs = document.querySelectorAll('.voice-pair');
