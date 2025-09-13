@@ -7,8 +7,9 @@ AI配音工具是一个专业的AI语音克隆配音解决方案，通过先进�
 ### 主要特性
 
 - **🎯 精确同步**: 支持时间拉伸策略，确保配音与字幕时长完全匹配
-- **🎨 高质量音频**: 基于Fish-speech\IndexTTS\CosyVoice\F5等模型，生成自然流畅的语音
+- **🎨 高质量音频**: 基于Fish-speech\IndexTTS\IndexTTS2\CosyVoice\F5等模型，生成自然流畅的语音
 - **⚙️ 灵活策略**: 提供基础策略和拉伸策略，适应不同需求
+- **🎭 情感控制**: IndexTTS2引擎支持情感表达控制，可通过音频、向量、文本等方式调节语音情感
 - **✨ 图形化界面**: 提供直观易用的 Web UI，支持文件拖拽上传、参数在线配置和实时进度展示，极大简化了操作流程。
 - **📊 实时监控**: 专业日志系统，实时显示处理进度和状态
 
@@ -19,6 +20,7 @@ open-dubbing/
 ├── run.sh                     # 一键部署启动脚本（Fish Speech）
 ├── install.sh                 # Fish Speech 环境安装脚本
 ├── install-index-tts.sh       # IndexTTS 环境安装脚本
+├── install-index-tts2.sh      # IndexTTS2 环境安装脚本
 ├── install-f5-tts.sh          # F5-TTS 环境安装脚本
 ├── install-cosyvoice.sh       # CosyVoice 环境安装脚本
 ├── server.py                  # Web UI 服务启动脚本
@@ -51,6 +53,7 @@ open-dubbing/
 │   │       ├── __init__.py        # 引擎注册
 │   │       ├── base_engine.py     # 抽象基类
 │   │       ├── index_tts_engine.py # IndexTTS引擎
+│   │       ├── index_tts2_engine.py # IndexTTS2引擎
 │   │       ├── f5_tts_engine.py   # F5-TTS引擎
 │   │       ├── cosy_voice_engine.py # CosyVoice引擎
 │   │       └── fish_speech_engine.py # Fish Speech引擎
@@ -93,6 +96,11 @@ open-dubbing/
 ./install-index-tts.sh
 ```
 
+#### IndexTTS2 引擎
+```bash
+./install-index-tts2.sh
+```
+
 #### F5-TTS 引擎
 ```bash
 ./install-f5-tts.sh
@@ -116,6 +124,10 @@ python server.py
 conda activate index-tts
 python server.py
 
+# IndexTTS2 引擎  
+conda activate index-tts2
+python server.py
+
 # F5-TTS 引擎
 conda activate f5-tts
 python server.py
@@ -125,7 +137,7 @@ conda activate cosyvoice
 python server.py
 ```
 
-> **注意**：在 Web UI 中记得将 TTS 引擎设置为对应的引擎类型（`fish_speech`、`index_tts`、`f5_tts`、`cosy_voice`）。
+> **注意**：在 Web UI 中记得将 TTS 引擎设置为对应的引擎类型（`fish_speech`、`index_tts`、`index_tts2`、`f5_tts`、`cosy_voice`）。
 
 ## 📝 使用说明
 
@@ -160,7 +172,11 @@ Web UI 主要分为以下几个功能区域：
 
 3.  **高级配置**:
     *   提供对 **并发数**、**字幕优化**、**时间借用** 等高级参数的精细调整。
-    *   所有配置修改后，可点击 **“保存配置”** 将其写入 `dubbing.conf` 文件，以便命令行或其他方式复用。
+    *   **IndexTTS2情感控制**: 当选择 `index_tts2` 引擎时，会显示专门的情感控制面板，支持：
+        *   **情感模式**: 自动分析、音频提示、情感向量、文本描述四种模式
+        *   **情感强度**: 可调节情感表达的强烈程度 (0.0-1.0)
+        *   **随机采样**: 增加语音的自然变化
+    *   所有配置修改后，可点击 **"保存配置"** 将其写入 `dubbing.conf` 文件，以便命令行或其他方式复用。
 
 4.  **开始处理**:
     *   所有参数设置完毕后，点击 **“开始配音”** 按钮启动任务。
@@ -195,7 +211,7 @@ prompt_texts = "这是第一段参考音频文本", "这是第二段参考音频
 # 输出音频文件路径（默认：output.wav）
 output_file = output/movie_dubbed.wav
 
-# TTS引擎选择：fish_speech, index_tts, f5_tts, cosy_voice
+# TTS引擎选择：fish_speech, index_tts, index_tts2, f5_tts, cosy_voice
 tts_engine = fish_speech
 
 # 时间同步策略：stretch, basic
@@ -205,6 +221,25 @@ strategy = stretch
 [高级配置]
 # 语言设置：zh, en, ja, ko（TXT模式专用）
 language = zh
+
+[IndexTTS2情感控制]
+# 情感控制模式：auto(自动), audio(音频提示), vector(情感向量), text(文本描述)
+emotion_mode = auto
+
+# 情感音频文件路径（emotion_mode = audio 时使用）
+emotion_audio_file = emotions/happy.wav
+
+# 情感向量（emotion_mode = vector 时使用，8个数值，逗号分隔）
+emotion_vector = 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8
+
+# 情感文本描述（emotion_mode = text 时使用）
+emotion_text = 开心愉悦的语调
+
+# 情感强度（0.0-1.0，默认0.8）
+emotion_alpha = 0.8
+
+# 是否使用随机采样（增加自然变化，默认false）
+use_random = false
 ```
 
 #### 3. 运行配音
