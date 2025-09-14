@@ -157,7 +157,7 @@ python server.py
 
 #### 界面功能概览
 
-![AI Dubbing Web UI](resources/webui.png)
+![AI Dubbing Web UI](resources/webui.jpeg)
 
 Web UI 主要分为以下几个功能区域：
 
