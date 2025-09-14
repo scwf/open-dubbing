@@ -235,6 +235,7 @@ def run_dubbing(
         
         # 添加IndexTTS2情感控制参数
         if emotion_config:
+            # 将emotion_config（情感控制参数字典）中的所有键值对，合并到runtime_kwargs参数字典中，用于后续TTS处理时传递情感相关配置
             runtime_kwargs.update(emotion_config)
         audio_segments = strategy_instance.process_entries(
             entries, voice_reference=voice_paths[0], **runtime_kwargs
