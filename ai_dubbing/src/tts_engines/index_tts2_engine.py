@@ -150,14 +150,14 @@ class IndexTTS2Engine(BaseTTSEngine):
         # 情感音频引导
         if 'emotion_audio_file' in input_kwargs and input_kwargs['emotion_audio_file']:
             inference_kwargs['emo_audio_prompt'] = input_kwargs['emotion_audio_file']
-            logger.debug(f"使用情感音频引导: {input_kwargs['emotion_audio_file']}")
+            logger.info(f"使用情感音频引导: {input_kwargs['emotion_audio_file']}")
         
         # 情感向量控制
         if 'emotion_vector' in input_kwargs and input_kwargs['emotion_vector']:
             emotion_vector = input_kwargs['emotion_vector']
             if isinstance(emotion_vector, (list, tuple)) and len(emotion_vector) == 8:
                 inference_kwargs['emo_vector'] = list(emotion_vector)
-                logger.debug(f"使用情感向量控制: {emotion_vector}")
+                logger.info(f"使用情感向量控制: {emotion_vector}")
             else:
                 logger.warning(f"情感向量格式错误，应为8个浮点数的列表，收到: {emotion_vector}")
         
@@ -165,25 +165,25 @@ class IndexTTS2Engine(BaseTTSEngine):
         if 'emotion_text' in input_kwargs and input_kwargs['emotion_text']:
             inference_kwargs['emo_text'] = input_kwargs['emotion_text']
             inference_kwargs['use_emo_text'] = True
-            logger.debug(f"使用情感文本描述: {input_kwargs['emotion_text']}")
+            logger.info(f"使用情感文本描述: {input_kwargs['emotion_text']}")
         elif input_kwargs.get('auto_emotion', False):
             # 自动情感检测模式
             inference_kwargs['use_emo_text'] = True
-            logger.debug("启用自动情感检测模式")
+            logger.info("启用自动情感检测模式")
         
         # 情感强度控制
         if 'emotion_alpha' in input_kwargs:
             alpha = float(input_kwargs['emotion_alpha'])
             if 0.0 <= alpha <= 1.0:
                 inference_kwargs['emo_alpha'] = alpha
-                logger.debug(f"设置情感强度: {alpha}")
+                logger.info(f"设置情感强度: {alpha}")
             else:
                 logger.warning(f"情感强度超出范围[0.0, 1.0]，收到: {alpha}")
         
         # 随机采样控制
         if 'use_random' in input_kwargs:
             inference_kwargs['use_random'] = bool(input_kwargs['use_random'])
-            logger.debug(f"随机采样: {inference_kwargs['use_random']}")
+            logger.info(f"随机采样: {inference_kwargs['use_random']}")
 
     def get_engine_info(self) -> Dict[str, Any]:
         """获取引擎信息"""
