@@ -13,6 +13,9 @@ AI配音工具是一个专业的AI语音克隆配音解决方案，通过先进�
 - **✨ 图形化界面**: 提供直观易用的 Web UI，支持文件拖拽上传、参数在线配置和实时进度展示，极大简化了操作流程。
 - **📊 实时监控**: 专业日志系统，实时显示处理进度和状态
 
+### 🎬 演示视频
+<video src="resources/open-dubbing.mp4" controls width="100%"></video>
+
 ## 🏗️ 项目架构
 
 ```
@@ -157,7 +160,7 @@ python server.py
 
 #### 界面功能概览
 
-![AI Dubbing Web UI](resources/webui.png)
+![AI Dubbing Web UI](resources/webui.jpeg)
 
 Web UI 主要分为以下几个功能区域：
 
