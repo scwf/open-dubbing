@@ -140,6 +140,175 @@ body {
   margin-bottom: 1rem;
 }
 
+/* Input Mode Selector Styles */
+.input-mode-selector {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  justify-content: center;
+}
+
+.radio-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.radio-option input[type="radio"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.radio-option input[type="radio"]:checked + i + span,
+.radio-option input[type="radio"]:checked ~ span {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.radio-option:has(input[type="radio"]:checked) {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: #667eea;
+}
+
+.radio-option i {
+  font-size: 1rem;
+  transition: color 0.3s ease;
+}
+
+.radio-option span {
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+/* Input Section Styles */
+.input-section {
+  transition: all 0.3s ease;
+}
+
+/* Text Input Styles */
+.text-input-group {
+  margin-bottom: 1rem;
+}
+
+.text-format-selector {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.format-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+}
+
+.format-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.format-option input[type="radio"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.format-option:has(input[type="radio"]:checked) {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: #667eea;
+}
+
+.format-option span {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.format-option small {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.text-input-container {
+  position: relative;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 120px;
+  padding: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.text-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.text-input-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.char-count {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+.format-help {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: right;
+  flex: 1;
+  margin-left: 1rem;
+}
+
 .upload-label {
   display: block;
   margin-bottom: 0.5rem;

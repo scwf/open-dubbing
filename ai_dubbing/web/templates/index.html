@@ -49,21 +49,69 @@
             <form id="dubbing-form" enctype="multipart/form-data">
               <!-- File Upload Section -->
               <div class="upload-section">
-                <h3><i class="fas fa-file-upload"></i> 文件上传</h3>
+                <h3><i class="fas fa-file-upload"></i> 内容输入</h3>
                 
-                <!-- SRT/TXT File Upload -->
-                <div class="upload-group">
-                  <label class="upload-label">
-                    <i class="fas fa-file-text"></i>
-                    <span>SRT/TXT 文件</span>
-                    <small>支持 .srt 和 .txt 格式</small>
+                <!-- Input Mode Selector -->
+                <div class="input-mode-selector">
+                  <label class="radio-option">
+                    <input type="radio" name="input_mode" value="file" checked>
+                    <i class="fas fa-file-upload"></i>
+                    <span>文件上传</span>
                   </label>
-                  <div class="file-upload-area" data-type="srt">
-                    <input type="file" name="input_file" accept=".srt,.txt" required class="file-input">
-                    <div class="upload-content">
-                      <i class="fas fa-cloud-upload-alt"></i>
-                      <p>点击选择文件或拖拽到此处</p>
-                      <span class="file-name">未选择文件</span>
+                  <label class="radio-option">
+                    <input type="radio" name="input_mode" value="text">
+                    <i class="fas fa-keyboard"></i>
+                    <span>直接输入</span>
+                  </label>
+                </div>
+                
+                <!-- File Upload Section -->
+                <div id="file-upload-section" class="input-section">
+                  <div class="upload-group">
+                    <label class="upload-label">
+                      <i class="fas fa-file-text"></i>
+                      <span>SRT/TXT 文件</span>
+                      <small>支持 .srt 和 .txt 格式</small>
+                    </label>
+                    <div class="file-upload-area" data-type="srt">
+                      <input type="file" name="input_file" accept=".srt,.txt" class="file-input">
+                      <div class="upload-content">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>点击选择文件或拖拽到此处</p>
+                        <span class="file-name">未选择文件</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Text Input Section -->
+                <div id="text-input-section" class="input-section" style="display: none;">
+                  <div class="text-input-group">
+                    <label class="upload-label">
+                      <i class="fas fa-keyboard"></i>
+                      <span>文本内容</span>
+                      <small>直接输入要配音的文本</small>
+                    </label>
+                    
+                    <div class="text-format-selector">
+                      <label class="format-option">
+                        <input type="radio" name="text_format" value="txt" checked>
+                        <span>纯文本格式</span>
+                        <small>每行一句话</small>
+                      </label>
+                      <label class="format-option">
+                        <input type="radio" name="text_format" value="srt">
+                        <span>SRT字幕格式</span>
+                        <small>包含时间轴的标准字幕</small>
+                      </label>
+                    </div>
+                    
+                    <div class="text-input-container">
+                      <textarea name="input_text" id="input_text" placeholder="请输入文本内容..." rows="10" class="text-input"></textarea>
+                      <div class="text-input-info">
+                        <span class="char-count">字符数: 0</span>
+                        <span class="format-help">提示：纯文本模式下每行一句话，SRT模式请按标准字幕格式输入</span>
+                      </div>
                     </div>
                   </div>
                 </div>

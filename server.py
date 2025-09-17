@@ -263,7 +263,10 @@ def run_dubbing(
 @app.post("/dubbing")
 async def create_dubbing(
     background_tasks: BackgroundTasks,
-    input_file: UploadFile = File(...),
+    input_mode: str = Form("file"),  # 新增：输入模式，默认为文件模式
+    input_file: UploadFile = File(None),  # 修改：变为可选
+    input_text: str = Form(None),  # 新增：文本输入内容
+    text_format: str = Form("txt"),  # 新增：文本格式
     voice_files: List[UploadFile] = File(...),
     voice_files_paths: List[str] = Form(...),
     prompt_texts: List[str] = Form(...),
@@ -284,9 +287,23 @@ async def create_dubbing(
     config.read(CONFIG_FILE, encoding="utf-8")
     optimized_srt_dir = config.get("字幕优化配置", "optimized_srt_output_file", fallback=None)
 
-    input_path = UPLOAD_DIR / input_file.filename
-    with open(input_path, "wb") as f:
-        f.write(await input_file.read())
+    # 验证输入模式和参数
+    if input_mode == "file":
+        if not input_file:
+            raise HTTPException(status_code=400, detail="文件模式下必须提供输入文件")
+        input_path = UPLOAD_DIR / input_file.filename
+        with open(input_path, "wb") as f:
+            f.write(await input_file.read())
+    elif input_mode == "text":
+        if not input_text or not input_text.strip():
+            raise HTTPException(status_code=400, detail="文本模式下必须提供输入文本")
+        # 创建临时文件保存文本内容
+        temp_filename = f"temp_{task_id}.{text_format}"
+        input_path = UPLOAD_DIR / temp_filename
+        with open(input_path, "w", encoding="utf-8") as f:
+            f.write(input_text.strip())
+    else:
+        raise HTTPException(status_code=400, detail="不支持的输入模式")
 
     if optimized_srt_dir and Path(optimized_srt_dir).is_dir():
         print(f"Optimized SRT would be saved in: {optimized_srt_dir}")
