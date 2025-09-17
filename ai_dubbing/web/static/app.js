@@ -394,6 +394,50 @@ async function loadConfig() {
     return config;
   }
 
+  // Setup input mode switching
+  function setupInputMode() {
+    const inputModeRadios = document.querySelectorAll('input[name="input_mode"]');
+    const fileUploadSection = document.getElementById('file-upload-section');
+    const textInputSection = document.getElementById('text-input-section');
+    
+    inputModeRadios.forEach(radio => {
+      radio.addEventListener('change', function() {
+        if (this.value === 'file') {
+          fileUploadSection.style.display = 'block';
+          textInputSection.style.display = 'none';
+          // Make file input required when file mode is selected
+          const fileInput = document.querySelector('input[name="input_file"]');
+          if (fileInput) fileInput.required = true;
+          // Remove text input requirement
+          const textInput = document.querySelector('textarea[name="input_text"]');
+          if (textInput) textInput.required = false;
+        } else if (this.value === 'text') {
+          fileUploadSection.style.display = 'none';
+          textInputSection.style.display = 'block';
+          // Make text input required when text mode is selected
+          const textInput = document.querySelector('textarea[name="input_text"]');
+          if (textInput) textInput.required = true;
+          // Remove file input requirement
+          const fileInput = document.querySelector('input[name="input_file"]');
+          if (fileInput) fileInput.required = false;
+        }
+      });
+    });
+  }
+  
+  // Setup text input functionality
+  function setupTextInput() {
+    const textInput = document.getElementById('input_text');
+    const charCount = document.querySelector('.char-count');
+    
+    if (textInput && charCount) {
+      textInput.addEventListener('input', function() {
+        const count = this.value.length;
+        charCount.textContent = `字符数: ${count}`;
+      });
+    }
+  }
+
   // Setup file upload functionality
   function setupFileUploads() {
     uploadAreas.forEach((area, index) => {
@@ -411,6 +455,12 @@ async function loadConfig() {
       // Prevent default drag behaviors
       area.addEventListener('dragenter', (e) => e.preventDefault());
     });
+    
+    // Setup input mode switching
+    setupInputMode();
+    
+    // Setup text input character count
+    setupTextInput();
   }
 
   function handleFileSelection(event, area, fileType) {
@@ -638,10 +688,22 @@ async function loadConfig() {
       const fieldsToAppend = ['tts_engine', 'strategy', 'language'];
       fieldsToAppend.forEach(id => formData.append(id, document.getElementById(id).value));
 
-      // Append file input
-      const inputFile = document.querySelector('input[name="input_file"]');
-      if(inputFile.files.length > 0) {
-        formData.append('input_file', inputFile.files[0]);
+      // Append input mode and content
+      const inputMode = document.querySelector('input[name="input_mode"]:checked').value;
+      formData.append('input_mode', inputMode);
+      
+      if (inputMode === 'file') {
+        // Append file input
+        const inputFile = document.querySelector('input[name="input_file"]');
+        if(inputFile.files.length > 0) {
+          formData.append('input_file', inputFile.files[0]);
+        }
+      } else if (inputMode === 'text') {
+        // Append text input
+        const inputText = document.querySelector('textarea[name="input_text"]').value;
+        const textFormat = document.querySelector('input[name="text_format"]:checked').value;
+        formData.append('input_text', inputText);
+        formData.append('text_format', textFormat);
       }
 
       // Append advanced config inputs
@@ -871,7 +933,6 @@ async function loadConfig() {
   }
 
   function validateForm() {
-    const requiredFields = form.querySelectorAll('[required]');
     let isValid = true;
     
     // Reset all error states
@@ -880,7 +941,48 @@ async function loadConfig() {
       field.style.borderColor = '';
     });
     
-    requiredFields.forEach(field => {
+    // Get input mode
+    const inputMode = document.querySelector('input[name="input_mode"]:checked').value;
+    
+    // Validate input content based on mode
+    if (inputMode === 'file') {
+      // Validate file input
+      const fileInput = document.querySelector('input[name="input_file"]');
+      if (fileInput.files.length === 0) {
+        isValid = false;
+        fileInput.classList.add('error-field');
+        fileInput.style.borderColor = '#ef4444';
+        fileInput.style.animation = 'shake 0.5s ease-in-out';
+        setTimeout(() => fileInput.style.animation = '', 500);
+      }
+      
+      // Validate file types
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const allowedTypes = ['.srt', '.txt'];
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        
+        if (!allowedTypes.includes(fileExtension)) {
+          isValid = false;
+          showDubbingError(`不支持的文件格式: ${fileExtension}。请选择 .srt 或 .txt 文件。`);
+          return false;
+        }
+      }
+    } else if (inputMode === 'text') {
+      // Validate text input
+      const textInput = document.querySelector('textarea[name="input_text"]');
+      if (!textInput.value.trim()) {
+        isValid = false;
+        textInput.classList.add('error-field');
+        textInput.style.borderColor = '#ef4444';
+        textInput.style.animation = 'shake 0.5s ease-in-out';
+        setTimeout(() => textInput.style.animation = '', 500);
+      }
+    }
+    
+    // Validate other required fields (TTS engine, strategy, voice files, etc.)
+    const otherRequiredFields = form.querySelectorAll('[required]:not([name="input_file"]):not([name="input_text"])');
+    otherRequiredFields.forEach(field => {
       const hasValue = field.type === 'file' ? field.files.length > 0 : field.value.trim() !== '';
       
       if (!hasValue) {
@@ -896,21 +998,8 @@ async function loadConfig() {
       }
     });
     
-    // Validate file types
-    const srtInput = document.querySelector('input[name="input_file"]');
+    // Validate voice file types
     const voiceInput = document.querySelector('input[name="voice_files"]');
-    
-    if (srtInput.files.length > 0) {
-      const file = srtInput.files[0];
-      const allowedTypes = ['.srt', '.txt'];
-      const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-      
-      if (!allowedTypes.includes(fileExtension)) {
-        isValid = false;
-        showDubbingError(`不支持的文件格式: ${fileExtension}。请选择 .srt 或 .txt 文件。`);
-        return false;
-      }
-    }
     
     if (voiceInput && voiceInput.files.length > 0) {
       for (let file of voiceInput.files) {
