@@ -297,8 +297,14 @@ async def create_dubbing(
     elif input_mode == "text":
         if not input_text or not input_text.strip():
             raise HTTPException(status_code=400, detail="文本模式下必须提供输入文本")
+        
+        allowed_text_formats = {"txt", "srt"}
+        normalized_text_format = (text_format or "").strip().lower()
+        if normalized_text_format not in allowed_text_formats:
+            raise HTTPException(status_code=400, detail="不支持的文本格式")
+        
         # 创建临时文件保存文本内容
-        temp_filename = f"temp_{task_id}.{text_format}"
+        temp_filename = f"temp_{task_id}.{normalized_text_format}"
         input_path = UPLOAD_DIR / temp_filename
         with open(input_path, "w", encoding="utf-8") as f:
             f.write(input_text.strip())
