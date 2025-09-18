@@ -55,6 +55,8 @@ async def dubbing_options():
     }
 
 
+from collections import defaultdict
+
 @app.get("/dubbing/built-in-audios")
 async def get_built_in_audios():
     """Get built-in reference audios from dubbing.conf."""
@@ -63,21 +65,20 @@ async def get_built_in_audios():
 
     audios = {}
     if config.has_section("内置参考音频"):
-        items = config.items("内置参考音频")
-        for key, value in items:
-            if key.endswith("_path"):
-                name = key[:-5]
-                if name not in audios:
-                    audios[name] = {}
-                audios[name]["path"] = value
-            elif key.endswith("_text"):
-                name = key[:-5]
-                if name not in audios:
-                    audios[name] = {}
-                audios[name]["text"] = value
+        # Group keys by a common prefix (the name of the audio)
+        grouped_data = defaultdict(dict)
+        for key, value in config.items("内置参考音频"):
+            if "_" in key:
+                name, suffix = key.rsplit("_", 1)
+                if suffix in ("path", "text"):
+                    grouped_data[name][suffix] = value
 
-    # Filter out incomplete entries
-    return {name: data for name, data in audios.items() if "path" in data and "text" in data}
+        # Construct the final dictionary from the grouped data
+        for name, data in grouped_data.items():
+            if "path" in data and "text" in data:
+                audios[name] = data
+
+    return audios
 
 
 @app.get("/dubbing/config")
