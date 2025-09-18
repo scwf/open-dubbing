@@ -205,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cleanupDubbingTask();
     setFormLoading(true);
+    dubbingStatusSection.style.display = 'block';
     showDubbingStatus('准备中...', '正在准备文件上传...');
     const formData = new FormData();
 
