@@ -116,24 +116,13 @@
                   </div>
                 </div>
 
-                <!-- Reference Audio Selection -->
-                <div class="upload-group">
-                  <label class="upload-label">
-                    <i class="fas fa-volume-up"></i>
-                    <span>参考音频</span>
-                    <small>选择内置或上传自定义参考音频</small>
-                  </label>
-                  <div class="reference-audio-selector">
-                    <select id="reference-audio-select" class="form-select">
-                      <!-- Options will be populated by JavaScript -->
-                    </select>
-                  </div>
+                <!-- Voice Files Upload -->
+                <div id="voice-pairs-container">
+                  <!-- Voice pair templates will be inserted here by JavaScript -->
                 </div>
-
-                <!-- Voice Pairs Container -->
-                <div id="voice-pairs-container" class="voice-pairs-container">
-                  <!-- Voice pair UI will be inserted here by JavaScript -->
-                </div>
+                <button type="button" id="add-voice-pair-btn" class="add-pair-btn">
+                  <i class="fas fa-plus"></i> 添加参考音频
+                </button>
               </div>
 
               <!-- Configuration Section -->
