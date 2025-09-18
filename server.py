@@ -61,17 +61,18 @@ async def get_built_in_audios():
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE, encoding="utf-8")
 
-    audios = {}
     prefix = "内置音频:"
-    for section in config.sections():
-        if section.startswith(prefix):
-            name = section[len(prefix):]
-            if config.has_option(section, "path") and config.has_option(section, "text"):
-                audios[name] = {
-                    "path": config.get(section, "path"),
-                    "text": config.get(section, "text"),
-                }
-    return audios
+
+    audio_sections = [s for s in config.sections() if s.startswith(prefix)]
+
+    return {
+        section[len(prefix):]: {
+            "path": config.get(section, "path"),
+            "text": config.get(section, "text"),
+        }
+        for section in audio_sections
+        if config.has_option(section, "path") and config.has_option(section, "text")
+    }
 
 
 @app.get("/dubbing/config")
