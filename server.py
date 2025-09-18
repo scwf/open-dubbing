@@ -70,8 +70,8 @@ async def get_built_in_audios():
             "path": config.get(section, "path"),
             "text": config.get(section, "text"),
         }
-    for section in audio_sections
-    if config.has_option(section, "path") and config.has_option(section, "text")
+        for section in audio_sections
+        if config.has_option(section, "path") and config.has_option(section, "text")
     }
 
 
