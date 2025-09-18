@@ -74,7 +74,6 @@ async def get_built_in_audios():
         if config.has_option(section, "path") and config.has_option(section, "text")
     }
 
-
 @app.get("/dubbing/config")
 async def get_dubbing_config():
     """Get runtime config from dubbing.conf."""
@@ -123,7 +122,7 @@ async def get_dubbing_config():
 
 @app.post("/dubbing/config")
 async def set_dubbing_config(request: Request):
-    """Update subtitile optimization runtime config in dubbing.conf."""
+    """Update runtime config in dubbing.conf."""
     data = await request.json()
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE, encoding="utf-8")
@@ -287,8 +286,8 @@ async def create_dubbing(
     input_file: UploadFile = File(None),  # 修改：变为可选
     input_text: str = Form(None),  # 新增：文本输入内容
     text_format: str = Form("txt"),  # 新增：文本格式
-    voice_files: List[UploadFile] = File(...),
-    voice_files_paths: List[str] = Form(...),
+    upload_voice_files: List[UploadFile] = File(...),
+    builtin_voice_files: List[str] = Form(...),
     prompt_texts: List[str] = Form(...),
     tts_engine: str = Form(...),
     strategy: str = Form(...),
@@ -336,14 +335,14 @@ async def create_dubbing(
 
     # Process voice files, combining new uploads and existing paths
     final_voice_paths = []
-    for i, uploaded_file in enumerate(voice_files):
+    for i, uploaded_file in enumerate(upload_voice_files):
         if uploaded_file.size > 0:
             file_path = UPLOAD_DIR / uploaded_file.filename
             with open(file_path, "wb") as f:
                 f.write(await uploaded_file.read())
             final_voice_paths.append(str(file_path))
-        elif i < len(voice_files_paths) and voice_files_paths[i]:
-            path_from_config = voice_files_paths[i]
+        elif i < len(builtin_voice_files) and builtin_voice_files[i]:
+            path_from_config = builtin_voice_files[i]
             final_voice_paths.append(path_from_config)
 
     if len(final_voice_paths) != len(prompt_texts):

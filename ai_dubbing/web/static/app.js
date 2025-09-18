@@ -249,14 +249,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (globalMode === 'custom_upload') {
             const fileInput = pair.querySelector('input[type="file"][name="voice_files"]');
             if (fileInput && fileInput.files.length > 0) {
-                formData.append('voice_files', fileInput.files[0]);
-                formData.append('voice_files_paths', '');
+                formData.append('upload_voice_files', fileInput.files[0]);
+                formData.append('builtin_voice_files', '');
                 formData.append('prompt_texts', promptText);
             }
         } else if (globalMode === 'built_in') {
             if (sourceWrapper.dataset.builtInPath) {
-                formData.append('voice_files', new Blob(), '');
-                formData.append('voice_files_paths', sourceWrapper.dataset.builtInPath);
+                formData.append('upload_voice_files', new Blob(), '');
+                formData.append('builtin_voice_files', sourceWrapper.dataset.builtInPath);
                 formData.append('prompt_texts', promptText);
             }
         }
@@ -905,6 +905,13 @@ async function loadConfig() {
     dubbingStatusMessage.textContent = message;
     dubbingProgressContainer.style.display = 'none';
     dubbingResultSection.style.display = 'none';
+  }
+
+  function showOptimizationStatus(title, message) {
+    optimizationStatusTitle.textContent = title;
+    optimizationStatusMessage.textContent = message;
+    optimizationProgressContainer.style.display = 'none';
+    optimizationResultSection.style.display = 'none';
   }
 
   function showDubbingError(message) {
