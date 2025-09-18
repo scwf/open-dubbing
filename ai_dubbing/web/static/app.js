@@ -753,16 +753,23 @@ async function loadConfig() {
     if (voicePairs.length === 0) {
         isValid = false;
     } else {
-        let hasValidPair = false;
         voicePairs.forEach(pair => {
             const promptText = pair.querySelector('textarea[name="prompt_texts"]');
-            if (promptText && promptText.value.trim() !== '') {
-                hasValidPair = true;
-            } else {
-                promptText.classList.add('error-field');
+            if (!promptText || !promptText.value.trim()) {
+                isValid = false;
+                if(promptText) promptText.classList.add('error-field');
+            }
+
+            // If it's a custom upload, also validate the file input
+            const isCustomUpload = referenceAudioSelect.value === 'custom_upload';
+            if (isCustomUpload) {
+                const voiceFileInput = pair.querySelector('input[type="file"][name="voice_files"]');
+                if (!voiceFileInput || voiceFileInput.files.length === 0) {
+                    isValid = false;
+                    if(voiceFileInput) voiceFileInput.closest('.file-upload-area').classList.add('error-field');
+                }
             }
         });
-        if (!hasValidPair) isValid = false;
     }
     
     if (!isValid) showError('请填写所有必填字段，并确保参考音频有对应的文本。');
