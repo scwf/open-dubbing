@@ -203,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     if (!validateForm()) return;
 
+    cleanupDubbingTask();
     setFormLoading(true);
     showDubbingStatus('准备中...', '正在准备文件上传...');
     const formData = new FormData();
