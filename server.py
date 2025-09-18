@@ -55,6 +55,17 @@ async def dubbing_options():
     }
 
 
+@app.get("/dubbing/built-in-audios")
+async def get_built_in_audios():
+    """Get built-in reference audios from dubbing.conf."""
+    config = configparser.ConfigParser()
+    config.read(CONFIG_FILE, encoding="utf-8")
+
+    if config.has_section("内置参考音频"):
+        return dict(config.items("内置参考音频"))
+    return {}
+
+
 @app.get("/dubbing/config")
 async def get_dubbing_config():
     """Get runtime config from dubbing.conf."""
