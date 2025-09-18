@@ -89,13 +89,22 @@ emotion_alpha = 0.8
 # 启用可增加语音多样性，但可能影响语音克隆的准确度
 use_random = false
 
-[内置参考音频]
-# 配置内置的参考音频，方便在Web UI中直接选择。
-# 每一对参考音频都包含一个文件路径和一个对应的参考文本。
-# 格式为: 名称_path = 文件路径  和  名称_text = 参考文本
+# ---------------- 内置参考音频配置 ----------------
 #
-# 例如:
-# 默认男声_path = resources/placeholder_male.wav
-# 默认男声_text = 这是默认男声的参考文本。
-# 默认女声_path = resources/placeholder_female.wav
-# 默认女声_text = 这是默认女声的参考文本。
+# 您可以在此配置多个内置参考音频，方便在Web UI中直接选择。
+# 每个内置音频都是一个独立的配置节（section），格式为 [内置音频:名称]。
+# "名称" 将会显示在UI的下拉菜单中。
+#
+# 每个配置节应包含两个键：
+# path: 音频文件的路径
+# text: 该音频对应的参考文本
+#
+# 示例:
+#
+# [内置音频:默认男声]
+# path = resources/placeholder_male.wav
+# text = 这是默认男声的参考文本。
+#
+# [内置音频:默认女声]
+# path = resources/placeholder_female.wav
+# text = 这是默认女声的参考文本。
