@@ -238,8 +238,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Other params (e.g., emotion controls)
-    // ...
+    // Append advanced config inputs
+    const configInputs = document.querySelectorAll('#tab-concurrency input');
+    configInputs.forEach(input => formData.append(input.name, input.value));
+
+    // Append IndexTTS2 emotion control parameters (only if IndexTTS2 is selected)
+    const selectedEngine = document.getElementById('tts_engine').value;
+    if (selectedEngine === 'index_tts2') {
+      // Emotion mode
+      const emotionMode = document.getElementById('emotion_mode');
+      if (emotionMode) {
+        formData.append('emotion_mode', emotionMode.value);
+      }
+
+      // Emotion audio file
+      const emotionAudioFile = document.getElementById('emotion_audio_file');
+      if (emotionAudioFile && emotionAudioFile.files.length > 0) {
+        formData.append('emotion_audio_file', emotionAudioFile.files[0]);
+      }
+
+      // Emotion vector
+      const emotionVector = document.getElementById('emotion_vector');
+      if (emotionVector && emotionVector.value.trim()) {
+        formData.append('emotion_vector', emotionVector.value.trim());
+      }
+
+      // Emotion text
+      const emotionText = document.getElementById('emotion_text');
+      if (emotionText && emotionText.value.trim()) {
+        formData.append('emotion_text', emotionText.value.trim());
+      }
+
+      // Emotion alpha
+      const emotionAlpha = document.getElementById('emotion_alpha');
+      if (emotionAlpha) {
+        formData.append('emotion_alpha', emotionAlpha.value);
+      }
+
+      // Use random
+      const useRandom = document.getElementById('use_random');
+      if (useRandom) {
+        formData.append('use_random', useRandom.checked);
+      }
+    }
 
     try {
         const response = await fetch('/dubbing', { method: 'POST', body: formData });
