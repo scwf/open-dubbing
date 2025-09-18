@@ -61,9 +61,23 @@ async def get_built_in_audios():
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE, encoding="utf-8")
 
+    audios = {}
     if config.has_section("内置参考音频"):
-        return dict(config.items("内置参考音频"))
-    return {}
+        items = config.items("内置参考音频")
+        for key, value in items:
+            if key.endswith("_path"):
+                name = key[:-5]
+                if name not in audios:
+                    audios[name] = {}
+                audios[name]["path"] = value
+            elif key.endswith("_text"):
+                name = key[:-5]
+                if name not in audios:
+                    audios[name] = {}
+                audios[name]["text"] = value
+
+    # Filter out incomplete entries
+    return {name: data for name, data in audios.items() if "path" in data and "text" in data}
 
 
 @app.get("/dubbing/config")

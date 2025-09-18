@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // MODIFIED: Voice pair management - now more flexible
-  function createVoicePair({ isCustom = false, name = '', path = '' } = {}) {
+  function createVoicePair({ isCustom = false, name = '', path = '', text = '' } = {}) {
     voicePairsContainer.innerHTML = ''; // Clear previous pair
     const pairDiv = document.createElement('div');
     pairDiv.classList.add('voice-pair');
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="file-name" style="color: #10b981;">${path}</span>
           </div>
         </div>
-        <textarea name="prompt_texts" placeholder="输入参考文本..." class="form-textarea" required></textarea>
+        <textarea name="prompt_texts" placeholder="输入参考文本..." class="form-textarea" required>${text}</textarea>
         <button type="button" class="remove-pair-btn"><i class="fas fa-trash"></i></button>
       `;
     }
@@ -176,8 +176,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (selectedValue === 'custom_upload') {
       createVoicePair({ isCustom: true });
     } else {
-      const audioPath = builtInAudios[selectedValue];
-      createVoicePair({ isCustom: false, name: selectedValue, path: audioPath });
+      const audioData = builtInAudios[selectedValue];
+      createVoicePair({
+        isCustom: false,
+        name: selectedValue,
+        path: audioData.path,
+        text: audioData.text
+      });
     }
   }
 

@@ -90,7 +90,12 @@ emotion_alpha = 0.8
 use_random = false
 
 [内置参考音频]
-# 配置内置的参考音频，方便在Web UI中直接选择
-# 左侧为显示在UI中的名称，右侧为音频文件的路径
-# 默认男声 = resources/placeholder_male.wav
-# 默认女声 = resources/placeholder_female.wav
+# 配置内置的参考音频，方便在Web UI中直接选择。
+# 每一对参考音频都包含一个文件路径和一个对应的参考文本。
+# 格式为: 名称_path = 文件路径  和  名称_text = 参考文本
+#
+# 例如:
+# 默认男声_path = resources/placeholder_male.wav
+# 默认男声_text = 这是默认男声的参考文本。
+# 默认女声_path = resources/placeholder_female.wav
+# 默认女声_text = 这是默认女声的参考文本。
