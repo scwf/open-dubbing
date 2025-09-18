@@ -89,3 +89,8 @@ emotion_alpha = 0.8
 # 启用可增加语音多样性，但可能影响语音克隆的准确度
 use_random = false
 
+[内置参考音频]
+# 配置内置的参考音频，方便在Web UI中直接选择
+# 左侧为显示在UI中的名称，右侧为音频文件的路径
+# 默认男声 = resources/placeholder_male.wav
+# 默认女声 = resources/placeholder_female.wav
