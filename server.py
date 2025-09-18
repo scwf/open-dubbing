@@ -55,6 +55,26 @@ async def dubbing_options():
     }
 
 
+@app.get("/dubbing/built-in-audios")
+async def get_built_in_audios():
+    """Get built-in reference audios from dubbing.conf."""
+    config = configparser.ConfigParser()
+    config.read(CONFIG_FILE, encoding="utf-8")
+
+    prefix = "内置音频:"
+
+    audio_sections = [s for s in config.sections() if s.startswith(prefix)]
+
+    return {
+        section[len(prefix):]: {
+            "path": config.get(section, "path"),
+            "text": config.get(section, "text"),
+        }
+        for section in audio_sections
+        if config.has_option(section, "path") and config.has_option(section, "text")
+    }
+
+
 @app.get("/dubbing/config")
 async def get_dubbing_config():
     """Get runtime config from dubbing.conf."""
@@ -103,7 +123,7 @@ async def get_dubbing_config():
 
 @app.post("/dubbing/config")
 async def set_dubbing_config(request: Request):
-    """Update runtime config in dubbing.conf."""
+    """Update subtitile optimization runtime config in dubbing.conf."""
     data = await request.json()
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE, encoding="utf-8")

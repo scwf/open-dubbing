@@ -117,8 +117,23 @@
                 </div>
 
                 <!-- Voice Files Upload -->
+                <div class="voice-mode-selector">
+                  <h4><i class="fas fa-audio-description"></i> 参考音频输入模式</h4>
+                  <div class="voice-mode-options">
+                    <label class="voice-mode-option">
+                      <input type="radio" name="global_voice_mode" value="custom_upload" checked>
+                      <i class="fas fa-upload"></i>
+                      <span>上传自定义音频</span>
+                    </label>
+                    <label class="voice-mode-option">
+                      <input type="radio" name="global_voice_mode" value="built_in">
+                      <i class="fas fa-music"></i>
+                      <span>使用内置音频</span>
+                    </label>
+                  </div>
+                </div>
                 <div id="voice-pairs-container">
-                  <!-- Voice pair template will be inserted here -->
+                  <!-- Voice pair templates will be inserted here by JavaScript -->
                 </div>
                 <button type="button" id="add-voice-pair-btn" class="add-pair-btn">
                   <i class="fas fa-plus"></i> 添加参考音频

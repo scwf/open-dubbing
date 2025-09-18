@@ -33,129 +33,308 @@ document.addEventListener('DOMContentLoaded', () => {
   // Subtitle optimization elements
   const optimizationForm = document.getElementById('optimization-form');
   const optimizeBtn = document.getElementById('optimize-btn');
-  
+
   const engineSelect = document.getElementById('tts_engine');
   const strategySelect = document.getElementById('strategy');
   const languageSelect = document.getElementById('language');
 
-  // File upload areas
-  const uploadAreas = document.querySelectorAll('.file-upload-area');
-  const fileInputs = document.querySelectorAll('.file-input');
+  // --- NEW ---
+  const voicePairsContainer = document.getElementById('voice-pairs-container');
+  const addVoicePairBtn = document.getElementById('add-voice-pair-btn');
+  const globalVoiceModeRadios = document.querySelectorAll('input[name="global_voice_mode"]');
+  let builtInAudios = {};
+  let currentTaskInterval = null;
+
+  // --- Main Initialization ---
+  async function initApp() {
+    await loadBuiltInAudios();
+    setupVoicePairControls();
+
+    // Setup the rest of the application
+    loadOptions();
+    loadConfig();
+    setupFileUploads();
+    setupFormSubmission();
+    setupOptimizationForm();
+    setupTabs();
+    setupMainTabs();
+    setupIndexTTS2Controls();
+    setupPasswordToggle();
+    setupTextInput();
+    setupInputMode();
+  }
+
+  // --- Data Loading ---
+  async function loadBuiltInAudios() {
+    try {
+      const response = await fetch('/dubbing/built-in-audios');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      builtInAudios = await response.json();
+    } catch (error) {
+      console.error('Failed to load built-in audios:', error);
+      showError('加载内置音频列表失败');
+    }
+  }
+
+  // --- Voice Pair Management ---
+  function setupVoicePairControls() {
+    addVoicePairBtn.addEventListener('click', () => createVoicePair());
+    globalVoiceModeRadios.forEach(radio => {
+      radio.addEventListener('change', () => updateAllVoicePairs());
+    });
+    if (voicePairsContainer.children.length === 0) {
+      createVoicePair(); // Add the first pair initially
+    }
+  }
+
+  function createVoicePair() {
+    const pairDiv = document.createElement('div');
+    pairDiv.classList.add('voice-pair');
+
+    pairDiv.innerHTML = `
+      <div class="voice-pair-content">
+        <div class="audio-source-wrapper"></div>
+        <textarea name="prompt_texts" placeholder="输入参考文本..." class="form-textarea" required></textarea>
+        <button type="button" class="remove-pair-btn"><i class="fas fa-trash"></i></button>
+      </div>
+    `;
+
+    pairDiv.querySelector('.remove-pair-btn').addEventListener('click', () => pairDiv.remove());
+
+    voicePairsContainer.appendChild(pairDiv);
+    updateVoicePairContent(pairDiv); // Initialize based on global mode
+  }
+
+  function updateAllVoicePairs() {
+    const voicePairs = document.querySelectorAll('.voice-pair');
+    voicePairs.forEach(pairDiv => updateVoicePairContent(pairDiv));
+  }
+
+  function updateVoicePairContent(pairDiv) {
+    const selectedMode = document.querySelector('input[name="global_voice_mode"]:checked').value;
+    const sourceWrapper = pairDiv.querySelector('.audio-source-wrapper');
+    const promptTextarea = pairDiv.querySelector('textarea[name="prompt_texts"]');
+
+    if (selectedMode === 'custom_upload') {
+      sourceWrapper.innerHTML = `
+        <div class="file-upload-area" data-type="voice">
+          <input type="file" name="voice_files" accept=".wav,.mp3" required class="file-input">
+          <div class="upload-content">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>选择语音文件</p>
+            <span class="file-name">未选择</span>
+          </div>
+        </div>`;
+      promptTextarea.value = '';
+      const input = sourceWrapper.querySelector('.file-input');
+      input.addEventListener('change', (e) => handleFileSelection(e, sourceWrapper.querySelector('.file-upload-area'), 'voice'));
+    } else {
+      // For built-in mode, show a selector for built-in audios
+      createBuiltInAudioSelector(sourceWrapper, promptTextarea);
+    }
+  }
+
+  function createBuiltInAudioSelector(sourceWrapper, promptTextarea) {
+    const selectHtml = Object.keys(builtInAudios).map(name => 
+      `<option value="${name}">${name}</option>`
+    ).join('');
+
+    sourceWrapper.innerHTML = `
+      <div class="built-in-audio-selector">
+        <label class="form-label">选择内置音频</label>
+        <select class="built-in-audio-select form-select">
+          <option value="">请选择内置音频</option>
+          ${selectHtml}
+        </select>
+      </div>`;
+
+    const select = sourceWrapper.querySelector('.built-in-audio-select');
+    select.addEventListener('change', (e) => {
+      const selectedAudio = e.target.value;
+      if (selectedAudio && builtInAudios[selectedAudio]) {
+        const audioData = builtInAudios[selectedAudio];
+        promptTextarea.value = audioData.text;
+        
+        // Store the path for form submission
+        sourceWrapper.dataset.builtInPath = audioData.path;
+        sourceWrapper.dataset.builtInName = selectedAudio;
+      } else {
+        promptTextarea.value = '';
+        delete sourceWrapper.dataset.builtInPath;
+        delete sourceWrapper.dataset.builtInName;
+      }
+    });
+  }
+
+  // --- Form Validation ---
+  function validateForm() {
+    let isValid = true;
+    form.querySelectorAll('.error-field').forEach(el => el.classList.remove('error-field'));
+
+    const inputMode = document.querySelector('input[name="input_mode"]:checked').value;
+    if (inputMode === 'file') {
+        const fileInput = document.querySelector('input[name="input_file"]');
+        if (!fileInput || fileInput.files.length === 0) {
+            isValid = false;
+            fileInput.closest('.file-upload-area').classList.add('error-field');
+        }
+    } else {
+        const textInput = document.querySelector('textarea[name="input_text"]');
+        if (!textInput || !textInput.value.trim()) {
+            isValid = false;
+            textInput.classList.add('error-field');
+        }
+    }
+
+    const voicePairs = document.querySelectorAll('.voice-pair');
+    if (voicePairs.length === 0) {
+        isValid = false;
+    }
+    voicePairs.forEach(pair => {
+        const promptText = pair.querySelector('textarea[name="prompt_texts"]');
+        if (!promptText || !promptText.value.trim()) {
+            isValid = false;
+            if(promptText) promptText.classList.add('error-field');
+        }
+
+        const globalMode = document.querySelector('input[name="global_voice_mode"]:checked').value;
+        if (globalMode === 'custom_upload') {
+            const fileInput = pair.querySelector('input[type="file"][name="voice_files"]');
+            if (!fileInput || fileInput.files.length === 0) {
+                isValid = false;
+                const uploadArea = pair.querySelector('.file-upload-area');
+                if (uploadArea) uploadArea.classList.add('error-field');
+            }
+        } else if (globalMode === 'built_in') {
+            const sourceWrapper = pair.querySelector('.audio-source-wrapper');
+            if (!sourceWrapper.dataset.builtInPath) {
+                isValid = false;
+                const selector = pair.querySelector('.built-in-audio-select');
+                if (selector) selector.classList.add('error-field');
+            }
+        }
+    });
+
+    if (!isValid) showError('请填写所有必填字段。');
+    return isValid;
+  }
+
+  // --- Form Submission ---
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    cleanupDubbingTask();
+    setFormLoading(true);
+    dubbingStatusSection.style.display = 'block';
+    showDubbingStatus('准备中...', '正在准备文件上传...');
+    const formData = new FormData();
+
+    // Main form data
+    ['tts_engine', 'strategy', 'language', 'input_mode', 'text_format', 'input_text'].forEach(id => {
+        const el = form.elements[id];
+        if(el) formData.append(id, el.value);
+    });
+    const inputFile = form.elements['input_file'];
+    if (inputFile && inputFile.files.length > 0) {
+        formData.append('input_file', inputFile.files[0]);
+    }
+
+    // Voice pairs data
+    const globalMode = document.querySelector('input[name="global_voice_mode"]:checked').value;
+    document.querySelectorAll('.voice-pair').forEach(pair => {
+        const promptText = pair.querySelector('textarea[name="prompt_texts"]').value;
+        const sourceWrapper = pair.querySelector('.audio-source-wrapper');
+        
+        if (globalMode === 'custom_upload') {
+            const fileInput = pair.querySelector('input[type="file"][name="voice_files"]');
+            if (fileInput && fileInput.files.length > 0) {
+                formData.append('voice_files', fileInput.files[0]);
+                formData.append('voice_files_paths', '');
+                formData.append('prompt_texts', promptText);
+            }
+        } else if (globalMode === 'built_in') {
+            if (sourceWrapper.dataset.builtInPath) {
+                formData.append('voice_files', new Blob(), '');
+                formData.append('voice_files_paths', sourceWrapper.dataset.builtInPath);
+                formData.append('prompt_texts', promptText);
+            }
+        }
+    });
+
+    // Append advanced config inputs
+    const configInputs = document.querySelectorAll('#tab-concurrency input');
+    configInputs.forEach(input => formData.append(input.name, input.value));
+
+    // Append IndexTTS2 emotion control parameters (only if IndexTTS2 is selected)
+    const selectedEngine = document.getElementById('tts_engine').value;
+    if (selectedEngine === 'index_tts2') {
+      // Emotion mode
+      const emotionMode = document.getElementById('emotion_mode');
+      if (emotionMode) {
+        formData.append('emotion_mode', emotionMode.value);
+      }
+
+      // Emotion audio file
+      const emotionAudioFile = document.getElementById('emotion_audio_file');
+      if (emotionAudioFile && emotionAudioFile.files.length > 0) {
+        formData.append('emotion_audio_file', emotionAudioFile.files[0]);
+      }
+
+      // Emotion vector
+      const emotionVector = document.getElementById('emotion_vector');
+      if (emotionVector && emotionVector.value.trim()) {
+        formData.append('emotion_vector', emotionVector.value.trim());
+      }
+
+      // Emotion text
+      const emotionText = document.getElementById('emotion_text');
+      if (emotionText && emotionText.value.trim()) {
+        formData.append('emotion_text', emotionText.value.trim());
+      }
+
+      // Emotion alpha
+      const emotionAlpha = document.getElementById('emotion_alpha');
+      if (emotionAlpha) {
+        formData.append('emotion_alpha', emotionAlpha.value);
+      }
+
+      // Use random
+      const useRandom = document.getElementById('use_random');
+      if (useRandom) {
+        formData.append('use_random', useRandom.checked);
+      }
+    }
+
+    try {
+        const response = await fetch('/dubbing', { method: 'POST', body: formData });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`请求失败: ${response.status} - ${errorText}`);
+        }
+        const result = await response.json();
+        if (result.task_id) {
+            pollTaskStatus(result.task_id);
+        } else {
+            showError('未能获取任务ID');
+        }
+    } catch (error) {
+        console.error('Submission error:', error);
+        showDubbingError(`配音失败: ${error.message}`);
+    } finally {
+        setFormLoading(false);
+    }
+  }
+
+  // --- All other original functions restored below ---
 
   document.addEventListener('click', (e) => {
     if (e.target.closest('.file-upload-area') && e.target.tagName !== 'INPUT') {
       const uploadArea = e.target.closest('.file-upload-area');
       const input = uploadArea.querySelector('.file-input');
-      if (input) {
-        input.click();
-      }
+      if (input) input.click();
     }
   });
-
-  // Voice pair management
-  const voicePairsContainer = document.getElementById('voice-pairs-container');
-  const addVoicePairBtn = document.getElementById('add-voice-pair-btn');
-  let pairCount = 0;
-  let currentTaskInterval = null; // 全局变量追踪当前任务的轮询interval
-
-  function createVoicePair() {
-    pairCount++;
-    const pairDiv = document.createElement('div');
-    pairDiv.classList.add('voice-pair');
-    pairDiv.innerHTML = `
-      <div class="file-upload-area" data-type="voice">
-        <input type="file" name="voice_files" accept=".wav,.mp3" required class="file-input">
-        <div class="upload-content">
-          <i class="fas fa-cloud-upload-alt"></i>
-          <p>选择语音文件</p>
-          <span class="file-name">未选择</span>
-        </div>
-      </div>
-      <textarea name="prompt_texts" placeholder="输入参考文本..." class="form-textarea" required></textarea>
-      <button type="button" class="remove-pair-btn"><i class="fas fa-trash"></i></button>
-    `;
-
-    const input = pairDiv.querySelector('.file-input');
-    const uploadArea = pairDiv.querySelector('.file-upload-area');
-    
-    input.addEventListener('change', (e) => handleFileSelection(e, uploadArea, 'voice'));
-    
-    const removeBtn = pairDiv.querySelector('.remove-pair-btn');
-    removeBtn.addEventListener('click', () => {
-      pairDiv.remove();
-    });
-
-    voicePairsContainer.appendChild(pairDiv);
-  }
-
-  addVoicePairBtn.addEventListener('click', createVoicePair);
-  createVoicePair(); // Add the first pair initially
-
-  // Initialize the application
-  initApp();
-
-  async function initApp() {
-    await loadOptions();
-    const basicConfig = await loadConfig();
-    setupFileUploads();
-    setupFormSubmission();
-    setupOptimizationForm();
-    setupFormValidation();
-    setupTabs();
-    setupIndexTTS2Controls();
-    setupMainTabs();
-    setupPasswordToggle();
-    // Populate voice pairs with config data if available
-    if (basicConfig && basicConfig.voice_files && basicConfig.prompt_texts) {
-      populateVoicePairsFromConfig(basicConfig);
-    }
-  }
-
-  function populateVoicePairsFromConfig(basicConfig) {
-    try {
-      // Clear the initial empty voice pair if it hasn't been used
-      const firstPair = voicePairsContainer.querySelector('.voice-pair');
-      const firstVoiceInput = firstPair ? firstPair.querySelector('input[type="file"]') : null;
-      const firstPrompt = firstPair ? firstPair.querySelector('textarea') : null;
-      if (firstPair && voicePairsContainer.children.length === 1 && firstVoiceInput && firstVoiceInput.files.length === 0 && firstPrompt && firstPrompt.value.trim() === '') {
-          voicePairsContainer.innerHTML = '';
-      }
-
-      const voiceFiles = basicConfig.voice_files.split(',').map(file => file.trim());
-      const promptTexts = basicConfig.prompt_texts.split(',').map(text => text.trim());
-
-      for (let i = 0; i < voiceFiles.length; i++) {
-        if (i >= promptTexts.length) break;
-        const pairDiv = document.createElement('div');
-        pairDiv.classList.add('voice-pair');
-        pairDiv.dataset.path = voiceFiles[i]; // Store original path
-
-        pairDiv.innerHTML = `
-          <div class="file-upload-area" data-type="voice">
-            <input type="file" name="voice_files" accept=".wav,.mp3" class="file-input">
-            <div class="upload-content">
-              <i class="fas fa-check-circle" style="color: #10b981;"></i>
-              <p>预设语音文件</p>
-              <span class="file-name" style="color: #10b981;">${voiceFiles[i].split(/[\\/]/).pop()}</span>
-            </div>
-          </div>
-          <textarea name="prompt_texts" placeholder="输入参考文本..." class="form-textarea" required>${promptTexts[i]}</textarea>
-          <button type="button" class="remove-pair-btn"><i class="fas fa-trash"></i></button>
-        `;
-
-        const input = pairDiv.querySelector('.file-input');
-        const uploadArea = pairDiv.querySelector('.file-upload-area');
-        input.addEventListener('change', (e) => handleFileSelection(e, uploadArea, 'voice'));
-
-        const removeBtn = pairDiv.querySelector('.remove-pair-btn');
-        removeBtn.addEventListener('click', () => pairDiv.remove());
-
-        voicePairsContainer.appendChild(pairDiv);
-      }
-    } catch (error) {
-      console.error('Failed to populate voice pairs from config:', error);
-    }
-  }
 
   function setupPasswordToggle() {
     document.addEventListener('click', e => {
@@ -165,73 +344,48 @@ document.addEventListener('DOMContentLoaded', () => {
         if (input && input.tagName === 'INPUT') {
           if (input.type === 'password') {
             input.type = 'text';
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
+            icon.classList.replace('fa-eye', 'fa-eye-slash');
           } else {
             input.type = 'password';
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
+            icon.classList.replace('fa-eye-slash', 'fa-eye');
           }
         }
       }
     });
   }
 
-  // Load options from server
   async function loadOptions() {
     try {
       showLoadingState();
       const response = await fetch('/dubbing/options');
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = await response.json();
-      
       populateSelect(engineSelect, data.tts_engines || [], 'TTS 引擎', 'fish_speech');
       populateSelect(strategySelect, data.strategies || [], '策略', 'stretch');
       populateSelect(languageSelect, data.languages || [], '语言');
-      
-      hideLoadingState();
     } catch (error) {
       console.error('Failed to load options:', error);
       showError('加载配置选项失败，请刷新页面重试');
+    } finally {
       hideLoadingState();
     }
   }
 
-  function showLoadingState() {
-    [engineSelect, strategySelect, languageSelect].forEach(select => {
-      select.innerHTML = '<option value="">加载中...</option>';
-      select.disabled = true;
-    });
-  }
-
-  function hideLoadingState() {
-    [engineSelect, strategySelect, languageSelect].forEach(select => {
-      select.disabled = false;
-    });
-  }
+  function showLoadingState() { [engineSelect, strategySelect, languageSelect].forEach(s => { s.innerHTML = '<option value="">加载中...</option>'; s.disabled = true; }); }
+  function hideLoadingState() { [engineSelect, strategySelect, languageSelect].forEach(s => { s.disabled = false; }); }
 
   function populateSelect(select, options, placeholder, defaultValue = null) {
     select.innerHTML = '';
-    
-    // Add placeholder option
     const placeholderOpt = document.createElement('option');
     placeholderOpt.value = '';
     placeholderOpt.textContent = `选择${placeholder}`;
     placeholderOpt.disabled = true;
     select.appendChild(placeholderOpt);
-    
-    // Add options
     options.forEach(option => {
       const opt = document.createElement('option');
       opt.value = option;
       opt.textContent = option;
-      if (option === defaultValue) {
-        opt.selected = true;
-      }
+      if (option === defaultValue) opt.selected = true;
       select.appendChild(opt);
     });
   }
@@ -301,7 +455,7 @@ async function loadConfig() {
     try {
       const response = await fetch('/dubbing/config');
       const data = await response.json();
-      
+
       // Set basic configuration values
       if (data.basic) {
         setConfigFieldValue('#tts_engine', data.basic.tts_engine);
@@ -399,7 +553,7 @@ async function loadConfig() {
     const inputModeRadios = document.querySelectorAll('input[name="input_mode"]');
     const fileUploadSection = document.getElementById('file-upload-section');
     const textInputSection = document.getElementById('text-input-section');
-    
+
     inputModeRadios.forEach(radio => {
       radio.addEventListener('change', function() {
         if (this.value === 'file') {
@@ -424,12 +578,12 @@ async function loadConfig() {
       });
     });
   }
-  
+
   // Setup text input functionality
   function setupTextInput() {
     const textInput = document.getElementById('input_text');
     const charCount = document.querySelector('.char-count');
-    
+
     if (textInput && charCount) {
       textInput.addEventListener('input', function() {
         const count = this.value.length;
@@ -440,25 +594,27 @@ async function loadConfig() {
 
   // Setup file upload functionality
   function setupFileUploads() {
+    const uploadAreas = document.querySelectorAll('.file-upload-area');
+    const fileInputs = document.querySelectorAll('.file-input');
     uploadAreas.forEach((area, index) => {
       const input = fileInputs[index];
       const fileType = area.dataset.type;
-      
+
       // File selection change
       input.addEventListener('change', (e) => handleFileSelection(e, area, fileType));
-      
+
       // Drag and drop
       area.addEventListener('dragover', handleDragOver);
       area.addEventListener('dragleave', handleDragLeave);
       area.addEventListener('drop', (e) => handleDrop(e, area, input, fileType));
-      
+
       // Prevent default drag behaviors
       area.addEventListener('dragenter', (e) => e.preventDefault());
     });
-    
+
     // Setup input mode switching
     setupInputMode();
-    
+
     // Setup text input character count
     setupTextInput();
   }
@@ -481,7 +637,7 @@ async function loadConfig() {
   function handleDrop(e, area, input, fileType) {
     e.preventDefault();
     area.classList.remove('dragover');
-    
+
     const files = e.dataTransfer.files;
     input.files = files;
     updateFileDisplay(area, files, fileType);
@@ -491,7 +647,7 @@ async function loadConfig() {
   function updateFileDisplay(area, files, fileType) {
     const fileNameSpan = area.querySelector('.file-name');
     const uploadContent = area.querySelector('.upload-content');
-    
+
     if (files.length > 0) {
       if (fileType === 'voice' && files.length > 1) {
         fileNameSpan.textContent = `已选择 ${files.length} 个文件`;
@@ -500,7 +656,7 @@ async function loadConfig() {
         fileNameSpan.textContent = files[0].name;
         fileNameSpan.style.color = '#10b981';
       }
-      
+
       // Update icon and text
       uploadContent.innerHTML = `
         <i class="fas fa-check-circle" style="color: #10b981;"></i>
@@ -510,7 +666,7 @@ async function loadConfig() {
     } else {
       fileNameSpan.textContent = '未选择文件';
       fileNameSpan.style.color = '#999';
-      
+
       // Reset to default
       uploadContent.innerHTML = `
         <i class="fas fa-cloud-upload-alt"></i>
@@ -534,11 +690,11 @@ async function loadConfig() {
   function setupOptimizationForm() {
     if (optimizationForm) {
       optimizationForm.addEventListener('submit', handleOptimizationSubmit);
-      
+
       // Setup file upload for optimization form
       const optimizationArea = optimizationForm.querySelector('.file-upload-area');
       const optimizationInput = optimizationForm.querySelector('.file-input');
-      
+
       if (optimizationArea && optimizationInput) {
         optimizationInput.addEventListener('change', (e) => handleFileSelection(e, optimizationArea, 'optimization-srt'));
         optimizationArea.addEventListener('dragover', handleDragOver);
@@ -551,9 +707,9 @@ async function loadConfig() {
 
   async function handleOptimizationSubmit(e) {
     e.preventDefault();
-    
+
     const optimizationFile = optimizationForm.querySelector('input[name="input_file"]');
-    
+
     if (!optimizationFile.files.length) {
       showError('请选择要优化的 SRT 文件');
       return;
@@ -568,34 +724,14 @@ async function loadConfig() {
 
     // 清理之前的任务状态
     cleanupOptimizationTask();
-    
+
     showOptimizationStatus('准备中...', '正在保存配置并准备字幕优化...');
     optimizationStatusSection.style.display = 'block';
     setOptimizationLoading(true);
-    
+
     try {
       // 首先保存字幕优化配置
-      const configData = {
-        concurrency: {
-          tts_max_concurrency: document.querySelector('[name="tts_max_concurrency"]')?.value || '',
-          tts_max_retries: document.querySelector('[name="tts_max_retries"]')?.value || '',
-        },
-        subtitle_optimization: {
-          llm_api_key: document.querySelector('input[name="opt_llm_api_key"]')?.value || '',
-          llm_model: document.querySelector('input[name="opt_llm_model"]')?.value || '',
-          base_url: document.querySelector('input[name="opt_base_url"]')?.value || '',
-          chinese_char_min_time: document.querySelector('input[name="opt_chinese_char_min_time"]')?.value || '',
-          english_word_min_time: document.querySelector('input[name="opt_english_word_min_time"]')?.value || '',
-          llm_max_concurrency: document.querySelector('input[name="opt_llm_max_concurrency"]')?.value || '',
-          llm_max_retries: document.querySelector('input[name="opt_llm_max_retries"]')?.value || '',
-          llm_timeout: document.querySelector('input[name="opt_llm_timeout"]')?.value || '',
-        },
-        time_borrowing: {
-          min_gap_threshold: document.querySelector('input[name="opt_min_gap_threshold"]')?.value || '',
-          borrow_ratio: document.querySelector('input[name="opt_borrow_ratio"]')?.value || '',
-          extra_buffer: document.querySelector('input[name="opt_extra_buffer"]')?.value || '',
-        }
-      };
+      const configData = getFormConfig();
 
       // 保存配置
       await fetch('/dubbing/config', {
@@ -615,20 +751,20 @@ async function loadConfig() {
         method: 'POST',
         body: formData
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`请求失败: ${response.status} - ${errorText}`);
       }
-      
+
       const result = await response.json();
-      
+
       if (result.task_id) {
         pollTaskStatus(result.task_id, 'optimization');
       } else {
         showError('未能获取任务ID');
       }
-      
+
     } catch (error) {
       console.error('Optimization error:', error);
       showOptimizationError(`字幕优化失败: ${error.message}`);
@@ -646,167 +782,18 @@ async function loadConfig() {
     }
   }
 
-  async function handleFormSubmit(e) {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    // 清理之前的任务状态
-    cleanupDubbingTask();
-    
-    showDubbingStatus('准备中...', '正在保存配置...');
-    dubbingStatusSection.style.display = 'block';
-    setFormLoading(true);
-    
-    try {
-      // 自动保存配置 - 和字幕优化保持一致
-      const configData = getFormConfig();
-      try {
-        const configResponse = await fetch('/dubbing/config', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(configData)
-        });
-        
-        if (configResponse.ok) {
-          showDubbingStatus('准备中...', '配置已保存，正在准备文件上传...');
-        } else {
-          console.warn('配置保存失败，但继续执行配音任务');
-          showDubbingStatus('准备中...', '正在准备文件上传...');
-        }
-      } catch (configError) {
-        console.warn('配置保存出错:', configError);
-        showDubbingStatus('准备中...', '正在准备文件上传...');
-      }
-      const formData = new FormData();
-
-      // Append standard fields
-      const fieldsToAppend = ['tts_engine', 'strategy', 'language'];
-      fieldsToAppend.forEach(id => formData.append(id, document.getElementById(id).value));
-
-      // Append input mode and content
-      const inputMode = document.querySelector('input[name="input_mode"]:checked').value;
-      formData.append('input_mode', inputMode);
-      
-      if (inputMode === 'file') {
-        // Append file input
-        const inputFile = document.querySelector('input[name="input_file"]');
-        if(inputFile.files.length > 0) {
-          formData.append('input_file', inputFile.files[0]);
-        }
-      } else if (inputMode === 'text') {
-        // Append text input
-        const inputText = document.querySelector('textarea[name="input_text"]').value;
-        const textFormat = document.querySelector('input[name="text_format"]:checked').value;
-        formData.append('input_text', inputText);
-        formData.append('text_format', textFormat);
-      }
-
-      // Append advanced config inputs
-      const configInputs = document.querySelectorAll('#tab-concurrency input');
-      configInputs.forEach(input => formData.append(input.name, input.value));
-
-      // Append IndexTTS2 emotion control parameters (only if IndexTTS2 is selected)
-      const selectedEngine = document.getElementById('tts_engine').value;
-      if (selectedEngine === 'index_tts2') {
-        // Emotion mode
-        const emotionMode = document.getElementById('emotion_mode');
-        if (emotionMode) {
-          formData.append('emotion_mode', emotionMode.value);
-        }
-
-        // Emotion audio file
-        const emotionAudioFile = document.getElementById('emotion_audio_file');
-        if (emotionAudioFile && emotionAudioFile.files.length > 0) {
-          formData.append('emotion_audio_file', emotionAudioFile.files[0]);
-        }
-
-        // Emotion vector
-        const emotionVector = document.getElementById('emotion_vector');
-        if (emotionVector && emotionVector.value.trim()) {
-          formData.append('emotion_vector', emotionVector.value.trim());
-        }
-
-        // Emotion text
-        const emotionText = document.getElementById('emotion_text');
-        if (emotionText && emotionText.value.trim()) {
-          formData.append('emotion_text', emotionText.value.trim());
-        }
-
-        // Emotion alpha
-        const emotionAlpha = document.getElementById('emotion_alpha');
-        if (emotionAlpha) {
-          formData.append('emotion_alpha', emotionAlpha.value);
-        }
-
-        // Use random
-        const useRandom = document.getElementById('use_random');
-        if (useRandom) {
-          formData.append('use_random', useRandom.checked);
-        }
-      }
-
-      // Handle voice pairs
-      const voicePairs = document.querySelectorAll('.voice-pair');
-      voicePairs.forEach(pair => {
-        const fileInput = pair.querySelector('input[type="file"]');
-        const promptText = pair.querySelector('textarea').value;
-        const originalPath = pair.dataset.path || '';
-
-        // Only add pairs that have either a new file or a pre-filled path and text
-        if ((fileInput.files.length > 0 || originalPath) && promptText) {
-            if (fileInput.files.length > 0) {
-                formData.append('voice_files', fileInput.files[0]);
-                formData.append('voice_files_paths', ''); // Placeholder
-            } else if (originalPath) {
-                formData.append('voice_files', new Blob(), ''); // Empty file placeholder
-                formData.append('voice_files_paths', originalPath);
-            }
-            formData.append('prompt_texts', promptText);
-        }
-      });
-
-      const response = await fetch('/dubbing', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`请求失败: ${response.status} - ${errorText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.task_id) {
-        pollTaskStatus(result.task_id);
-      } else {
-        showError('未能获取任务ID');
-      }
-      
-    } catch (error) {
-      console.error('Submission error:', error);
-      showDubbingError(`配音失败: ${error.message}`);
-      setFormLoading(false);
-    }
-  }
-
   async function pollTaskStatus(taskId, taskType = 'dubbing') {
     if (taskType === 'optimization') {
       showOptimizationProgress();
     } else {
       showDubbingProgress();
     }
-    
+
     // 根据任务类型确定状态查询URL
-    const statusUrl = taskType === 'optimization' 
-      ? `/subtitle-optimization/status/${taskId}` 
+    const statusUrl = taskType === 'optimization'
+      ? `/subtitle-optimization/status/${taskId}`
       : `/dubbing/status/${taskId}`;
-    
+
     // 定义状态检查函数
     const checkStatus = async () => {
       try {
@@ -814,20 +801,20 @@ async function loadConfig() {
         if (!response.ok) {
           throw new Error('无法获取任务状态');
         }
-        
+
         const data = await response.json();
-        
+
         // 只在开发模式下显示详细日志
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          console.log('任务状态更新:', { 
-            taskId, 
+          console.log('任务状态更新:', {
+            taskId,
             taskType,
-            status: data.status, 
-            progress: data.progress, 
-            message: data.message 
+            status: data.status,
+            progress: data.progress,
+            message: data.message
           });
         }
-        
+
         // 根据任务类型更新状态
         if (taskType === 'optimization') {
           optimizationStatusTitle.textContent = '字幕优化中...';
@@ -838,7 +825,7 @@ async function loadConfig() {
           dubbingStatusMessage.textContent = data.message || `当前进度: ${data.progress}%`;
           updateDubbingProgress(data.progress);
         }
-        
+
         if (data.status === 'completed') {
           if (currentTaskInterval) {
             clearInterval(currentTaskInterval);
@@ -884,12 +871,12 @@ async function loadConfig() {
         return true; // 停止轮询
       }
     };
-    
+
     // 立即执行第一次检查，避免等待轮询间隔
     if (await checkStatus()) {
       return; // 任务已完成或失败，无需轮询
     }
-    
+
     // 设置高频轮询以捕获快速状态变化 (500ms间隔)
     currentTaskInterval = setInterval(async () => {
       if (await checkStatus()) {
@@ -899,126 +886,6 @@ async function loadConfig() {
         }
       }
     }, 500);
-  }
-
-  function updateProgress(progress) {
-    progressFill.style.width = `${progress}%`;
-    progressText.textContent = `${Math.round(progress)}%`;
-  }
-
-  function cleanupPreviousTask() {
-    // 清理之前的轮询interval
-    if (currentTaskInterval) {
-      clearInterval(currentTaskInterval);
-      currentTaskInterval = null;
-    }
-    
-    // 重置状态界面元素的显示状态
-    statusTitle.style.display = '';
-    statusMessage.style.display = '';
-    const statusIcon = document.querySelector('.status-icon');
-    if (statusIcon) {
-      statusIcon.style.display = '';
-    }
-    
-    // 重置进度条
-    updateProgress(0);
-    
-    // 隐藏结果区域
-    resultSection.style.display = 'none';
-    progressContainer.style.display = 'none';
-    
-    // 重置按钮状态
-    setFormLoading(false);
-  }
-
-  function validateForm() {
-    let isValid = true;
-    
-    // Reset all error states
-    form.querySelectorAll('.error-field').forEach(field => {
-      field.classList.remove('error-field');
-      field.style.borderColor = '';
-    });
-    
-    // Get input mode
-    const inputMode = document.querySelector('input[name="input_mode"]:checked').value;
-    
-    // Validate input content based on mode
-    if (inputMode === 'file') {
-      // Validate file input
-      const fileInput = document.querySelector('input[name="input_file"]');
-      if (fileInput.files.length === 0) {
-        isValid = false;
-        fileInput.classList.add('error-field');
-        fileInput.style.borderColor = '#ef4444';
-        fileInput.style.animation = 'shake 0.5s ease-in-out';
-        setTimeout(() => fileInput.style.animation = '', 500);
-      }
-      
-      // Validate file types
-      if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        const allowedTypes = ['.srt', '.txt'];
-        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-        
-        if (!allowedTypes.includes(fileExtension)) {
-          isValid = false;
-          showDubbingError(`不支持的文件格式: ${fileExtension}。请选择 .srt 或 .txt 文件。`);
-          return false;
-        }
-      }
-    } else if (inputMode === 'text') {
-      // Validate text input
-      const textInput = document.querySelector('textarea[name="input_text"]');
-      if (!textInput.value.trim()) {
-        isValid = false;
-        textInput.classList.add('error-field');
-        textInput.style.borderColor = '#ef4444';
-        textInput.style.animation = 'shake 0.5s ease-in-out';
-        setTimeout(() => textInput.style.animation = '', 500);
-      }
-    }
-    
-    // Validate other required fields (TTS engine, strategy, voice files, etc.)
-    const otherRequiredFields = form.querySelectorAll('[required]:not([name="input_file"]):not([name="input_text"])');
-    otherRequiredFields.forEach(field => {
-      const hasValue = field.type === 'file' ? field.files.length > 0 : field.value.trim() !== '';
-      
-      if (!hasValue) {
-        isValid = false;
-        field.classList.add('error-field');
-        field.style.borderColor = '#ef4444';
-        
-        // Add error animation
-        field.style.animation = 'shake 0.5s ease-in-out';
-        setTimeout(() => {
-          field.style.animation = '';
-        }, 500);
-      }
-    });
-    
-    // Validate voice file types
-    const voiceInput = document.querySelector('input[name="voice_files"]');
-    
-    if (voiceInput && voiceInput.files.length > 0) {
-      for (let file of voiceInput.files) {
-        const allowedTypes = ['.wav', '.mp3'];
-        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-        
-        if (!allowedTypes.includes(fileExtension)) {
-          isValid = false;
-          showDubbingError(`不支持的音频格式: ${fileExtension}。请选择 .wav 或 .mp3 文件。`);
-          return false;
-        }
-      }
-    }
-    
-    if (!isValid) {
-      showDubbingError('请填写所有必填字段');
-    }
-    
-    return isValid;
   }
 
   function setFormLoading(loading) {
@@ -1033,6 +900,43 @@ async function loadConfig() {
     }
   }
 
+  function showDubbingStatus(title, message) {
+    dubbingStatusTitle.textContent = title;
+    dubbingStatusMessage.textContent = message;
+    dubbingProgressContainer.style.display = 'none';
+    dubbingResultSection.style.display = 'none';
+  }
+
+  function showDubbingError(message) {
+    showDubbingStatus('配音失败', message);
+    dubbingProgressContainer.style.display = 'none';
+
+    // Show error in dubbing status section
+    dubbingStatusSection.style.display = 'block';
+
+    // Auto-hide after 8 seconds
+    setTimeout(() => {
+      if (dubbingStatusTitle.textContent === '配音失败') {
+        dubbingStatusSection.style.display = 'none';
+      }
+    }, 8000);
+  }
+
+  function showError(message) {
+    showStatus('错误', message);
+    progressContainer.style.display = 'none';
+
+    // Show error in status section
+    statusSection.style.display = 'block';
+
+    // Auto-hide after 8 seconds
+    setTimeout(() => {
+      if (statusTitle.textContent === '错误') {
+        statusSection.style.display = 'none';
+      }
+    }, 8000);
+  }
+
   function showStatus(title, message) {
     statusTitle.textContent = title;
     statusMessage.textContent = message;
@@ -1040,11 +944,14 @@ async function loadConfig() {
     resultSection.style.display = 'none';
   }
 
-  function showOptimizationStatus(title, message) {
-    optimizationStatusTitle.textContent = title;
-    optimizationStatusMessage.textContent = message;
-    optimizationProgressContainer.style.display = 'none';
-    optimizationResultSection.style.display = 'none';
+  function showDubbingProgress() {
+    showDubbingStatus('配音处理中...', '正在处理配音...');
+    dubbingProgressContainer.style.display = 'block';
+  }
+
+  function updateDubbingProgress(progress) {
+    dubbingProgressFill.style.width = `${progress}%`;
+    dubbingProgressText.textContent = `${Math.round(progress)}%`;
   }
 
   function showOptimizationProgress() {
@@ -1110,24 +1017,6 @@ async function loadConfig() {
     setOptimizationLoading(false);
   }
 
-  // Dubbing status functions
-  function showDubbingStatus(title, message) {
-    dubbingStatusTitle.textContent = title;
-    dubbingStatusMessage.textContent = message;
-    dubbingProgressContainer.style.display = 'none';
-    dubbingResultSection.style.display = 'none';
-  }
-
-  function showDubbingProgress() {
-    showDubbingStatus('配音处理中...', '正在处理配音...');
-    dubbingProgressContainer.style.display = 'block';
-  }
-
-  function updateDubbingProgress(progress) {
-    dubbingProgressFill.style.width = `${progress}%`;
-    dubbingProgressText.textContent = `${Math.round(progress)}%`;
-  }
-
   function showDubbingResult(resultUrl) {
     const fileName = resultUrl.split('/').pop();
     
@@ -1181,77 +1070,6 @@ async function loadConfig() {
     setFormLoading(false);
   }
 
-  function showDubbingError(message) {
-    showDubbingStatus('配音失败', message);
-    dubbingProgressContainer.style.display = 'none';
-    
-    // Show error in dubbing status section
-    dubbingStatusSection.style.display = 'block';
-    
-    // Auto-hide after 8 seconds
-    setTimeout(() => {
-      if (dubbingStatusTitle.textContent === '配音失败') {
-        dubbingStatusSection.style.display = 'none';
-      }
-    }, 8000);
-  }
-
-  function showProgress() {
-    showStatus('处理中...', '正在上传文件并开始配音处理...');
-    progressContainer.style.display = 'block';
-  }
-
-  function showResult(resultUrl) {
-    // 只处理配音结果
-    const fileName = resultUrl.split('/').pop();
-    
-    statusTitle.textContent = '配音完成';
-    statusMessage.textContent = '您的配音文件已准备就绪，可以下载了！';
-    
-    // 更新结果区域的文本
-    const resultTitle = resultSection.querySelector('h3');
-    const resultDesc = resultSection.querySelector('p');
-    if (resultTitle) resultTitle.textContent = '配音完成！';
-    if (resultDesc) resultDesc.textContent = '您的配音文件已准备就绪';
-    
-    // 隐藏加载图标
-    const statusIcon = document.querySelector('.status-icon');
-    if (statusIcon) {
-      statusIcon.style.display = 'none';
-    }
-
-    downloadLink.href = resultUrl;
-    downloadLink.download = fileName;
-    resultSection.style.display = 'block';
-    progressContainer.style.display = 'none';
-    
-    // Add success animation
-    resultSection.classList.add('success-animation');
-    setTimeout(() => {
-      resultSection.classList.remove('success-animation');
-    }, 600);
-  }
-
-  function showSuccess(message) {
-    showStatus('完成', message);
-    progressContainer.style.display = 'none';
-  }
-
-  function showError(message) {
-    showStatus('错误', message);
-    progressContainer.style.display = 'none';
-    
-    // Show error in status section
-    statusSection.style.display = 'block';
-    
-    // Auto-hide after 8 seconds
-    setTimeout(() => {
-      if (statusTitle.textContent === '错误') {
-        statusSection.style.display = 'none';
-      }
-    }, 8000);
-  }
-
   function showOptimizationError(message) {
     showOptimizationStatus('优化失败', message);
     optimizationProgressContainer.style.display = 'none';
@@ -1267,20 +1085,7 @@ async function loadConfig() {
     }, 8000);
   }
 
-  // Add some interactive effects
-  document.addEventListener('DOMContentLoaded', () => {
-    // Add hover effects to form elements
-    const formElements = document.querySelectorAll('.form-textarea, .form-select');
-    formElements.forEach(element => {
-      element.addEventListener('focus', () => {
-        element.parentElement.style.transform = 'scale(1.02)';
-      });
-      
-      element.addEventListener('blur', () => {
-        element.parentElement.style.transform = 'scale(1)';
-      });
-    });
-  });
+  initApp();
 });
 
 // Add shake animation and error styles via CSS
