@@ -101,10 +101,10 @@ use_random = false
 #
 # 示例:
 #
-# [内置音频:默认男声]
-# path = resources/placeholder_male.wav
-# text = 这是默认男声的参考文本。
+# [内置音频:你的音频名称1]
+# path = /path/to/your/audio1.wav
+# text = 这是你的音频1的参考文本。
 #
-# [内置音频:默认女声]
-# path = resources/placeholder_female.wav
-# text = 这是默认女声的参考文本。
+# [内置音频:你的音频名称2]
+# path = /path/to/your/audio2.wav
+# text = 这是你的音频2的参考文本。
