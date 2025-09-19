@@ -990,16 +990,166 @@ body {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
 }
 
+/* Voice Mode Selector */
+.voice-mode-selector {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 12px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.voice-mode-selector h4 {
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.voice-mode-selector h4 i {
+  color: #667eea;
+  font-size: 1.2rem;
+}
+
+.voice-mode-options {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.voice-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 60px;
+}
+
+.voice-mode-option:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.voice-mode-option input[type="radio"] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: #667eea;
+  flex-shrink: 0;
+}
+
+.voice-mode-option input[type="radio"]:checked + i + span,
+.voice-mode-option input[type="radio"]:checked ~ span {
+  color: #667eea;
+  font-weight: 700;
+}
+
+.voice-mode-option:has(input[type="radio"]:checked) {
+  background: rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+  border-width: 3px;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.25);
+}
+
+.voice-mode-option i {
+  font-size: 1.2rem;
+  transition: color 0.3s ease;
+  color: #4a5568;
+  flex-shrink: 0;
+}
+
+.voice-mode-option:has(input[type="radio"]:checked) i {
+  color: #667eea;
+}
+
+.voice-mode-option span {
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  color: #2d3748;
+  text-align: center;
+}
+
+.voice-mode-option:has(input[type="radio"]:checked) span {
+  color: #667eea;
+  font-weight: 700;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .voice-mode-options {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .voice-mode-option {
+    min-height: 50px;
+    padding: 0.75rem 1rem;
+  }
+  
+  .voice-mode-option span {
+    font-size: 0.9rem;
+  }
+  
+  .voice-mode-option i {
+    font-size: 1.1rem;
+  }
+}
+
+/* Built-in Audio Selector */
+.built-in-audio-selector {
+  width: 100%;
+}
+
+.built-in-audio-selector .form-label {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.built-in-audio-select {
+  width: 100%;
+}
+
 /* Voice Pair Styling */
 .voice-pair {
   display: flex;
+  flex-direction: column;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+.voice-pair-content {
+  display: flex;
+  gap: 1rem;
   align-items: stretch;
 }
 
-.voice-pair .file-upload-area {
+.voice-pair .audio-source-wrapper {
   flex: 1;
+}
+
+.voice-pair .file-upload-area {
+  width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1015,15 +1165,21 @@ body {
   background: #ef4444;
   color: white;
   border: none;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .voice-pair .remove-pair-btn:hover {
   background: #dc2626;
+  transform: scale(1.1);
 }
 
 .add-pair-btn {
