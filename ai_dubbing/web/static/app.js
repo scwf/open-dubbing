@@ -688,11 +688,6 @@ async function loadConfig() {
       area.addEventListener('dragenter', (e) => e.preventDefault());
     });
 
-    // Setup input mode switching
-    setupInputMode();
-
-    // Setup text input character count
-    setupTextInput();
   }
 
   function handleFileSelection(event, area, fileType) {
