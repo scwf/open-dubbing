@@ -1,5 +1,5 @@
 # 项目通用Python依赖（不包含各TTS引擎与PyTorch）
-# 各TTS引擎请按 INSTALL.md 分节单独安装；PyTorch 请按CUDA版本选择官方源安装
+# 各TTS引擎请按 README.md 分节单独安装
 
 colorama
 ffmpeg-python
