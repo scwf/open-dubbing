@@ -18,17 +18,20 @@ from ai_dubbing.src.audio_processor import AudioProcessor
 
 app = FastAPI()
 
-TEMPLATE_DIR = Path("ai_dubbing/web/templates")
-STATIC_DIR = Path("ai_dubbing/web/static")
-RESULT_DIR = Path("outputs")
-UPLOAD_DIR = Path("uploads")
+# 获取项目根目录（server.py所在目录）
+PROJECT_ROOT = Path(__file__).parent.resolve()
+
+TEMPLATE_DIR = PROJECT_ROOT / "ai_dubbing/web/templates"
+STATIC_DIR = PROJECT_ROOT / "ai_dubbing/web/static"
+RESULT_DIR = PROJECT_ROOT / "outputs"
+UPLOAD_DIR = PROJECT_ROOT / "uploads"
 
 TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 RESULT_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-CONFIG_FILE = Path("ai_dubbing/dubbing.conf")
+CONFIG_FILE = PROJECT_ROOT / "ai_dubbing/dubbing.conf"
 
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -37,6 +40,24 @@ app.mount("/results", StaticFiles(directory=str(RESULT_DIR)), name="results")
 tasks = {}  # 配音任务
 optimization_tasks = {}  # 字幕优化任务
 
+def resolve_audio_path(path_str: str) -> str:
+    """Resolve audio file path relative to project root."""
+    path = Path(path_str)
+    if path.is_absolute():
+        return str(path)
+    else:
+        # 相对路径基于项目根目录解析
+        resolved_path = PROJECT_ROOT / path
+        return str(resolved_path)
+
+def resolve_audio_paths_list(paths_str: str) -> str:
+    """Resolve comma-separated audio file paths relative to project root."""
+    if not paths_str.strip():
+        return ""
+    
+    paths = [path.strip() for path in paths_str.split(',')]
+    resolved_paths = [resolve_audio_path(path) for path in paths if path.strip()]
+    return ','.join(resolved_paths)
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -54,7 +75,6 @@ async def dubbing_options():
         "languages": languages,
     }
 
-
 @app.get("/dubbing/built-in-audios")
 async def get_built_in_audios():
     """Get built-in reference audios from dubbing.conf."""
@@ -67,7 +87,7 @@ async def get_built_in_audios():
 
     return {
         section[len(prefix):]: {
-            "path": config.get(section, "path"),
+            "path": resolve_audio_path(config.get(section, "path")),
             "text": config.get(section, "text"),
         }
         for section in audio_sections
@@ -82,7 +102,7 @@ async def get_dubbing_config():
     
     config_data = {
         "basic": {
-            "voice_files": config.get("基本配置", "voice_files", fallback=""),
+            "voice_files": resolve_audio_paths_list(config.get("基本配置", "voice_files", fallback="")),
             "prompt_texts": config.get("基本配置", "prompt_texts", fallback=""),
             "tts_engine": config.get("基本配置", "tts_engine", fallback="fish_speech"),
             "strategy": config.get("基本配置", "strategy", fallback="stretch"),
@@ -147,6 +167,120 @@ async def set_dubbing_config(request: Request):
         config.write(f)
     return {"status": "success"}
 
+
+@app.post("/dubbing")
+async def create_dubbing(
+    background_tasks: BackgroundTasks,
+    input_mode: str = Form("file"),  # 新增：输入模式，默认为文件模式
+    input_file: UploadFile = File(None),  # 修改：变为可选
+    input_text: str = Form(None),  # 新增：文本输入内容
+    text_format: str = Form("txt"),  # 新增：文本格式
+    upload_voice_files: List[UploadFile] = File(...),
+    builtin_voice_files: List[str] = Form(...),
+    prompt_texts: List[str] = Form(...),
+    tts_engine: str = Form(...),
+    strategy: str = Form(...),
+    language: str = Form("zh"),
+    # IndexTTS2情感控制参数 (可选)
+    emotion_mode: str = Form("auto"),
+    emotion_audio_file: UploadFile = File(None),
+    emotion_vector: str = Form(""),
+    emotion_text: str = Form(""),
+    emotion_alpha: float = Form(0.8),
+    use_random: bool = Form(False),
+):
+    """Process an upload and return the generated audio path."""
+    task_id = uuid.uuid4().hex
+    config = configparser.ConfigParser()
+    config.read(CONFIG_FILE, encoding="utf-8")
+    optimized_srt_dir = config.get("字幕优化配置", "optimized_srt_output_file", fallback=None)
+
+    # 验证输入模式和参数
+    if input_mode == "file":
+        if not input_file:
+            raise HTTPException(status_code=400, detail="文件模式下必须提供输入文件")
+        input_path = UPLOAD_DIR / input_file.filename
+        with open(input_path, "wb") as f:
+            f.write(await input_file.read())
+    elif input_mode == "text":
+        if not input_text or not input_text.strip():
+            raise HTTPException(status_code=400, detail="文本模式下必须提供输入文本")
+        
+        allowed_text_formats = {"txt", "srt"}
+        normalized_text_format = (text_format or "").strip().lower()
+        if normalized_text_format not in allowed_text_formats:
+            raise HTTPException(status_code=400, detail="不支持的文本格式")
+        
+        # 创建临时文件保存文本内容
+        temp_filename = f"temp_{task_id}.{normalized_text_format}"
+        input_path = UPLOAD_DIR / temp_filename
+        with open(input_path, "w", encoding="utf-8") as f:
+            f.write(input_text.strip())
+    else:
+        raise HTTPException(status_code=400, detail="不支持的输入模式")
+
+    if optimized_srt_dir and Path(optimized_srt_dir).is_dir():
+        print(f"Optimized SRT would be saved in: {optimized_srt_dir}")
+
+    # Process voice files, combining new uploads and existing paths
+    final_voice_paths = []
+    for i, uploaded_file in enumerate(upload_voice_files):
+        if uploaded_file.size > 0:
+            file_path = UPLOAD_DIR / uploaded_file.filename
+            with open(file_path, "wb") as f:
+                f.write(await uploaded_file.read())
+            final_voice_paths.append(str(file_path))
+        elif i < len(builtin_voice_files) and builtin_voice_files[i]:
+            path_from_config = resolve_audio_path(builtin_voice_files[i])
+            final_voice_paths.append(path_from_config)
+
+    if len(final_voice_paths) != len(prompt_texts):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Mismatch between voice files ({len(final_voice_paths)}) and prompts ({len(prompt_texts)}).",
+        )
+
+    # 处理IndexTTS2情感音频文件
+    emotion_audio_path = None
+    if tts_engine == "index_tts2" and emotion_mode == "audio" and emotion_audio_file and emotion_audio_file.size > 0:
+        emotion_audio_path = UPLOAD_DIR / f"emotion_{uuid.uuid4().hex}_{emotion_audio_file.filename}"
+        with open(emotion_audio_path, "wb") as f:
+            f.write(await emotion_audio_file.read())
+
+    # 构建情感配置参数
+    emotion_config = {}
+    if tts_engine == "index_tts2":
+        if emotion_mode == "audio" and emotion_audio_path:
+            emotion_config["emotion_audio_file"] = str(emotion_audio_path)
+        elif emotion_mode == "vector" and emotion_vector:
+            try:
+                emotion_config["emotion_vector"] = [float(x.strip()) for x in emotion_vector.split(',')]
+            except ValueError:
+                pass  # 忽略格式错误，使用默认值
+        elif emotion_mode == "text" and emotion_text:
+            emotion_config["emotion_text"] = emotion_text
+        elif emotion_mode == "auto":
+            emotion_config["auto_emotion"] = True
+        
+        emotion_config["emotion_alpha"] = emotion_alpha
+        emotion_config["use_random"] = use_random
+
+    output_path = RESULT_DIR / f"{uuid.uuid4().hex}.wav"
+
+    background_tasks.add_task(
+        run_dubbing,
+        task_id=task_id,
+        input_path=input_path,
+        voice_paths=final_voice_paths,
+        output_path=output_path,
+        tts_engine_name=tts_engine,
+        strategy_name=strategy,
+        language=language,
+        prompt_texts=prompt_texts,
+        emotion_config=emotion_config,
+    )
+
+    return {"task_id": task_id}
 
 def run_subtitle_optimization(
     task_id: str,
@@ -277,121 +411,6 @@ def run_dubbing(
         tasks[task_id]["status"] = "failed"
         tasks[task_id]["error"] = str(e)
         tasks[task_id]["message"] = "处理失败"
-
-
-@app.post("/dubbing")
-async def create_dubbing(
-    background_tasks: BackgroundTasks,
-    input_mode: str = Form("file"),  # 新增：输入模式，默认为文件模式
-    input_file: UploadFile = File(None),  # 修改：变为可选
-    input_text: str = Form(None),  # 新增：文本输入内容
-    text_format: str = Form("txt"),  # 新增：文本格式
-    upload_voice_files: List[UploadFile] = File(...),
-    builtin_voice_files: List[str] = Form(...),
-    prompt_texts: List[str] = Form(...),
-    tts_engine: str = Form(...),
-    strategy: str = Form(...),
-    language: str = Form("zh"),
-    # IndexTTS2情感控制参数 (可选)
-    emotion_mode: str = Form("auto"),
-    emotion_audio_file: UploadFile = File(None),
-    emotion_vector: str = Form(""),
-    emotion_text: str = Form(""),
-    emotion_alpha: float = Form(0.8),
-    use_random: bool = Form(False),
-):
-    """Process an upload and return the generated audio path."""
-    task_id = uuid.uuid4().hex
-    config = configparser.ConfigParser()
-    config.read(CONFIG_FILE, encoding="utf-8")
-    optimized_srt_dir = config.get("字幕优化配置", "optimized_srt_output_file", fallback=None)
-
-    # 验证输入模式和参数
-    if input_mode == "file":
-        if not input_file:
-            raise HTTPException(status_code=400, detail="文件模式下必须提供输入文件")
-        input_path = UPLOAD_DIR / input_file.filename
-        with open(input_path, "wb") as f:
-            f.write(await input_file.read())
-    elif input_mode == "text":
-        if not input_text or not input_text.strip():
-            raise HTTPException(status_code=400, detail="文本模式下必须提供输入文本")
-        
-        allowed_text_formats = {"txt", "srt"}
-        normalized_text_format = (text_format or "").strip().lower()
-        if normalized_text_format not in allowed_text_formats:
-            raise HTTPException(status_code=400, detail="不支持的文本格式")
-        
-        # 创建临时文件保存文本内容
-        temp_filename = f"temp_{task_id}.{normalized_text_format}"
-        input_path = UPLOAD_DIR / temp_filename
-        with open(input_path, "w", encoding="utf-8") as f:
-            f.write(input_text.strip())
-    else:
-        raise HTTPException(status_code=400, detail="不支持的输入模式")
-
-    if optimized_srt_dir and Path(optimized_srt_dir).is_dir():
-        print(f"Optimized SRT would be saved in: {optimized_srt_dir}")
-
-    # Process voice files, combining new uploads and existing paths
-    final_voice_paths = []
-    for i, uploaded_file in enumerate(upload_voice_files):
-        if uploaded_file.size > 0:
-            file_path = UPLOAD_DIR / uploaded_file.filename
-            with open(file_path, "wb") as f:
-                f.write(await uploaded_file.read())
-            final_voice_paths.append(str(file_path))
-        elif i < len(builtin_voice_files) and builtin_voice_files[i]:
-            path_from_config = builtin_voice_files[i]
-            final_voice_paths.append(path_from_config)
-
-    if len(final_voice_paths) != len(prompt_texts):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Mismatch between voice files ({len(final_voice_paths)}) and prompts ({len(prompt_texts)}).",
-        )
-
-    # 处理IndexTTS2情感音频文件
-    emotion_audio_path = None
-    if tts_engine == "index_tts2" and emotion_mode == "audio" and emotion_audio_file and emotion_audio_file.size > 0:
-        emotion_audio_path = UPLOAD_DIR / f"emotion_{uuid.uuid4().hex}_{emotion_audio_file.filename}"
-        with open(emotion_audio_path, "wb") as f:
-            f.write(await emotion_audio_file.read())
-
-    # 构建情感配置参数
-    emotion_config = {}
-    if tts_engine == "index_tts2":
-        if emotion_mode == "audio" and emotion_audio_path:
-            emotion_config["emotion_audio_file"] = str(emotion_audio_path)
-        elif emotion_mode == "vector" and emotion_vector:
-            try:
-                emotion_config["emotion_vector"] = [float(x.strip()) for x in emotion_vector.split(',')]
-            except ValueError:
-                pass  # 忽略格式错误，使用默认值
-        elif emotion_mode == "text" and emotion_text:
-            emotion_config["emotion_text"] = emotion_text
-        elif emotion_mode == "auto":
-            emotion_config["auto_emotion"] = True
-        
-        emotion_config["emotion_alpha"] = emotion_alpha
-        emotion_config["use_random"] = use_random
-
-    output_path = RESULT_DIR / f"{uuid.uuid4().hex}.wav"
-
-    background_tasks.add_task(
-        run_dubbing,
-        task_id=task_id,
-        input_path=input_path,
-        voice_paths=final_voice_paths,
-        output_path=output_path,
-        tts_engine_name=tts_engine,
-        strategy_name=strategy,
-        language=language,
-        prompt_texts=prompt_texts,
-        emotion_config=emotion_config,
-    )
-
-    return {"task_id": task_id}
 
 
 @app.get("/dubbing/status/{task_id}")
