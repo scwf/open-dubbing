@@ -51,8 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupVoicePairControls();
 
     // Setup the rest of the application
-    loadOptions();
-    loadConfig();
+    await loadOptions();
+    await loadConfig();
+    
+    // Setup UI components that depend on loaded data
     setupFileUploads();
     setupFormSubmission();
     setupOptimizationForm();
@@ -166,56 +168,130 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- File Type Validation ---
+  function validateFileType(file, allowedExtensions, fileTypeDescription) {
+    if (!file) return { isValid: false, error: '未选择文件' };
+    
+    const fileName = file.name.toLowerCase();
+    const isValidType = allowedExtensions.some(ext => fileName.endsWith(ext.toLowerCase()));
+    
+    if (!isValidType) {
+      return {
+        isValid: false,
+        error: `不支持的文件类型。${fileTypeDescription}支持的格式：${allowedExtensions.join(', ')}`
+      };
+    }
+    
+    return { isValid: true };
+  }
+
   // --- Form Validation ---
   function validateForm() {
     let isValid = true;
+    let errorMessages = [];
     form.querySelectorAll('.error-field').forEach(el => el.classList.remove('error-field'));
 
-    const inputMode = document.querySelector('input[name="input_mode"]:checked').value;
-    if (inputMode === 'file') {
-        const fileInput = document.querySelector('input[name="input_file"]');
-        if (!fileInput || fileInput.files.length === 0) {
-            isValid = false;
-            fileInput.closest('.file-upload-area').classList.add('error-field');
+    // 安全获取输入模式，使用可选链操作符
+    const inputModeElement = document.querySelector('input[name="input_mode"]:checked');
+    const inputMode = inputModeElement?.value;
+    if (!inputMode) {
+      isValid = false;
+      errorMessages.push('请选择输入模式');
+    } else if (inputMode === 'file') {
+      const fileInput = document.querySelector('input[name="input_file"]');
+      if (!fileInput) {
+        isValid = false;
+        errorMessages.push('找不到文件输入元素');
+      } else if (fileInput.files.length === 0) {
+        isValid = false;
+        const uploadArea = fileInput.closest('.file-upload-area');
+        if (uploadArea) uploadArea.classList.add('error-field');
+        errorMessages.push('请选择输入文件');
+      } else {
+        // 验证主输入文件类型 (SRT/TXT)
+        const file = fileInput.files[0];
+        const validation = validateFileType(file, ['.srt', '.txt'], '字幕文件');
+        if (!validation.isValid) {
+          isValid = false;
+          const uploadArea = fileInput.closest('.file-upload-area');
+          if (uploadArea) uploadArea.classList.add('error-field');
+          errorMessages.push(validation.error);
         }
-    } else {
-        const textInput = document.querySelector('textarea[name="input_text"]');
-        if (!textInput || !textInput.value.trim()) {
-            isValid = false;
-            textInput.classList.add('error-field');
-        }
+      }
+    } else if (inputMode === 'text') {
+      const textInput = document.querySelector('textarea[name="input_text"]');
+      if (!textInput) {
+        isValid = false;
+        errorMessages.push('找不到文本输入元素');
+      } else if (!textInput.value.trim()) {
+        isValid = false;
+        textInput.classList.add('error-field');
+        errorMessages.push('请输入文本内容');
+      }
     }
 
     const voicePairs = document.querySelectorAll('.voice-pair');
     if (voicePairs.length === 0) {
-        isValid = false;
+      isValid = false;
+      errorMessages.push('请至少添加一个参考音频');
     }
-    voicePairs.forEach(pair => {
-        const promptText = pair.querySelector('textarea[name="prompt_texts"]');
-        if (!promptText || !promptText.value.trim()) {
-            isValid = false;
-            if(promptText) promptText.classList.add('error-field');
-        }
+    
+    voicePairs.forEach((pair, index) => {
+      const promptText = pair.querySelector('textarea[name="prompt_texts"]');
+      if (!promptText) {
+        isValid = false;
+        errorMessages.push(`第${index + 1}个音频组缺少参考文本输入框`);
+      } else if (!promptText.value.trim()) {
+        isValid = false;
+        promptText.classList.add('error-field');
+        errorMessages.push(`第${index + 1}个音频组的参考文本不能为空`);
+      }
 
-        const globalMode = document.querySelector('input[name="global_voice_mode"]:checked').value;
-        if (globalMode === 'custom_upload') {
-            const fileInput = pair.querySelector('input[type="file"][name="voice_files"]');
-            if (!fileInput || fileInput.files.length === 0) {
-                isValid = false;
-                const uploadArea = pair.querySelector('.file-upload-area');
-                if (uploadArea) uploadArea.classList.add('error-field');
-            }
-        } else if (globalMode === 'built_in') {
-            const sourceWrapper = pair.querySelector('.audio-source-wrapper');
-            if (!sourceWrapper.dataset.builtInPath) {
-                isValid = false;
-                const selector = pair.querySelector('.built-in-audio-select');
-                if (selector) selector.classList.add('error-field');
-            }
+      // 安全获取全局模式
+      const globalModeElement = document.querySelector('input[name="global_voice_mode"]:checked');
+      const globalMode = globalModeElement?.value;
+      if (!globalMode) {
+        isValid = false;
+        errorMessages.push('请选择参考音频输入模式');
+      } else if (globalMode === 'custom_upload') {
+        const fileInput = pair.querySelector('input[type="file"][name="voice_files"]');
+        if (!fileInput) {
+          isValid = false;
+          errorMessages.push(`第${index + 1}个音频组缺少文件输入元素`);
+        } else if (fileInput.files.length === 0) {
+          isValid = false;
+          const uploadArea = pair.querySelector('.file-upload-area');
+          if (uploadArea) uploadArea.classList.add('error-field');
+          errorMessages.push(`第${index + 1}个音频组请选择音频文件`);
+        } else {
+          // 验证语音文件类型 (WAV/MP3)
+          const file = fileInput.files[0];
+          const validation = validateFileType(file, ['.wav', '.mp3'], '音频文件');
+          if (!validation.isValid) {
+            isValid = false;
+            const uploadArea = pair.querySelector('.file-upload-area');
+            if (uploadArea) uploadArea.classList.add('error-field');
+            errorMessages.push(`第${index + 1}个音频组：${validation.error}`);
+          }
         }
+      } else if (globalMode === 'built_in') {
+        const sourceWrapper = pair.querySelector('.audio-source-wrapper');
+        if (!sourceWrapper) {
+          isValid = false;
+          errorMessages.push(`第${index + 1}个音频组缺少音频源容器`);
+        } else if (!sourceWrapper.dataset || !sourceWrapper.dataset.builtInPath) {  // 安全访问dataset
+          isValid = false;
+          const selector = pair.querySelector('.built-in-audio-select');
+          if (selector) selector.classList.add('error-field');
+          errorMessages.push(`第${index + 1}个音频组请选择内置音频`);
+        }
+      }
     });
 
-    if (!isValid) showError('请填写所有必填字段。');
+    if (!isValid) {
+      const errorMessage = errorMessages.length > 0 ? errorMessages.join('\n') : '请填写所有必填字段';
+      showError(errorMessage);
+    }
     return isValid;
   }
 
