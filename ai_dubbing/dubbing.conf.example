@@ -100,11 +100,14 @@ use_random = false
 # text: 该音频对应的参考文本
 #
 # 示例:
-#
-# [内置音频:你的音频名称1]
-# path = /path/to/your/audio1.wav
-# text = 这是你的音频1的参考文本。
-#
-# [内置音频:你的音频名称2]
-# path = /path/to/your/audio2.wav
-# text = 这是你的音频2的参考文本。
+[内置音频:wm1]
+path = resources/wm1.wav
+text = "希望你以后做得比我还好哟"
+
+[内置音频:qjc]
+path = resources/qjc.wav
+text = "你说遇事不决，可问春风，春风不语，即随本心"
+
+[内置音频:tyzr]
+path = resources/tyzr.wav
+text = "对，这就是我，万人敬仰的太乙真人"
