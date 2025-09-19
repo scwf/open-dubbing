@@ -271,8 +271,8 @@
                 </button>
               </div>
 
-              <!-- Dubbing Status Section - moved inside dubbing form -->
-              <div class="dubbing-status-section" id="dubbing-status-section" style="display: none;">
+              <!-- Dubbing Status Section -->
+              <div class="task-status-section" id="dubbing-status-section" style="display: none;">
                 <div class="status-content">
                   <div class="status-icon">
                     <i class="fas fa-spinner fa-spin"></i>
@@ -282,16 +282,12 @@
                     <p id="dubbing-status-message">正在上传文件并开始配音处理</p>
                   </div>
                 </div>
-                
-                <!-- Progress Bar -->
                 <div class="progress-container" id="dubbing-progress-container" style="display: none;">
                   <div class="progress-bar">
                     <div class="progress-fill" id="dubbing-progress-fill"></div>
                   </div>
                   <span class="progress-text" id="dubbing-progress-text">0%</span>
                 </div>
-
-                <!-- Result Section -->
                 <div class="result-section" id="dubbing-result-section" style="display: none;">
                   <div class="result-content">
                     <i class="fas fa-check-circle success-icon"></i>
@@ -443,8 +439,8 @@
                 </button>
               </div>
 
-              <!-- Optimization Status Section - moved inside optimization form -->
-              <div class="optimization-status-section" id="optimization-status-section" style="display: none;">
+              <!-- Optimization Status Section -->
+              <div class="task-status-section" id="optimization-status-section" style="display: none;">
                 <div class="status-content">
                   <div class="status-icon">
                     <i class="fas fa-spinner fa-spin"></i>
@@ -454,16 +450,12 @@
                     <p id="optimization-status-message">正在保存配置并准备字幕优化...</p>
                   </div>
                 </div>
-                
-                <!-- Progress Bar -->
                 <div class="progress-container" id="optimization-progress-container" style="display: none;">
                   <div class="progress-bar">
                     <div class="progress-fill" id="optimization-progress-fill"></div>
                   </div>
                   <span class="progress-text" id="optimization-progress-text">0%</span>
                 </div>
-
-                <!-- Result Section -->
                 <div class="result-section" id="optimization-result-section" style="display: none;">
                   <div class="result-content">
                     <i class="fas fa-check-circle success-icon"></i>
@@ -481,7 +473,7 @@
         </div>
       </div>
 
-      <!-- Status Section for Dubbing -->
+      <!-- General Status Section (fallback) -->
       <div class="status-section" id="status-section" style="display: none;">
         <div class="status-content">
           <div class="status-icon">
@@ -489,19 +481,15 @@
           </div>
           <div class="status-text">
             <h3 id="status-title">处理中...</h3>
-            <p id="status-message">正在上传文件并开始配音处理</p>
+            <p id="status-message">正在处理...</p>
           </div>
         </div>
-        
-        <!-- Progress Bar -->
         <div class="progress-container" id="progress-container" style="display: none;">
           <div class="progress-bar">
             <div class="progress-fill"></div>
           </div>
           <span class="progress-text">0%</span>
         </div>
-
-        <!-- Result Section -->
         <div class="result-section" id="result-section" style="display: none;">
           <div class="result-content">
             <i class="fas fa-check-circle success-icon"></i>
