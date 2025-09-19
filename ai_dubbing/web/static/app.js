@@ -4,10 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusTitle = document.getElementById('status-title');
   const statusMessage = document.getElementById('status-message');
   const progressContainer = document.getElementById('progress-container');
-  const progressFill = document.getElementById('progress-fill');
-  const progressText = document.getElementById('progress-text');
   const resultSection = document.getElementById('result-section');
-  const downloadLink = document.getElementById('download-link');
   const submitBtn = document.getElementById('submit-btn');
 
   // Optimization status elements
