@@ -253,7 +253,7 @@ class ValidationConfig:
 class LogConfig:
     """日志相关配置"""
     # 进度显示配置
-    PROGRESS_TEXT_PREVIEW_LENGTH = 30
+    PROGRESS_TEXT_PREVIEW_LENGTH = 200
     
     # 日志格式
     ERROR_PREFIX = "错误"

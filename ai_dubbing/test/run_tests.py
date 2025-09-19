@@ -15,15 +15,24 @@ current_file = Path(__file__).resolve()
 sys.path.insert(0, str(current_file.parent.parent.parent))
 
 if __name__ == '__main__':
-    print("🧪 运行LLM字幕优化器测试...")
+    print("🧪 运行所有单元测试...")
     
-    # 运行新测试
+    # 运行所有测试
     import subprocess
-    result = subprocess.run([
-        sys.executable, "-m", "pytest", 
-        "test_llm_optimizer.py", 
-        "-v"
-    ], cwd=os.path.dirname(__file__))
+    import glob
+    
+    # 获取所有测试文件
+    test_files = glob.glob(os.path.join(os.path.dirname(__file__), "test_*.py"))
+    
+    if test_files:
+        result = subprocess.run([
+            sys.executable, "-m", "pytest", 
+            *[os.path.basename(f) for f in test_files], 
+            "-v"
+        ], cwd=os.path.dirname(__file__))
+    else:
+        # 如果没有找到测试文件，直接使用unittest
+        result = subprocess.run([sys.executable, "-c", "exit(1)"])
     
     # 如果没有pytest，使用unittest
     if result.returncode != 0:
@@ -31,12 +40,26 @@ if __name__ == '__main__':
         loader = unittest.TestLoader()
         suite = unittest.TestSuite()
         
-        # 加载LLM测试
-        from ai_dubbing.test.test_llm_optimizer import TestLLMContextOptimizer
-        from ai_dubbing.test.test_llm_optimizer import TestLLMIntegration
+        # 加载所有测试模块
+        test_modules = [
+            "test_llm_optimizer",
+            "test_srt_parser", 
+            "test_txt_parser"
+        ]
         
-        suite.addTest(loader.loadTestsFromTestCase(TestLLMContextOptimizer))
-        suite.addTest(loader.loadTestsFromTestCase(TestLLMIntegration))
+        for module_name in test_modules:
+            try:
+                module = __import__(f"ai_dubbing.test.{module_name}", fromlist=[module_name])
+                # 获取模块中所有的测试类
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+                    if (isinstance(attr, type) and 
+                        issubclass(attr, unittest.TestCase) and 
+                        attr != unittest.TestCase):
+                        print(f"📝 加载测试类: {attr_name}")
+                        suite.addTest(loader.loadTestsFromTestCase(attr))
+            except ImportError as e:
+                print(f"⚠️  跳过模块 {module_name}: {e}")
         
         runner = unittest.TextTestRunner(verbosity=2)
         result = runner.run(suite)
