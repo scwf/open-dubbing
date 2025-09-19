@@ -749,11 +749,6 @@ async function loadConfig() {
     }
   }
 
-  // Setup form validation
-  function setupFormValidation() {
-    // Validation will now only run on submit
-  }
-
   // Setup form submission
   function setupFormSubmission() {
     form.addEventListener('submit', handleFormSubmit);
