@@ -3,10 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 import uuid
-import sys
 import configparser
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
+from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -16,7 +18,49 @@ from ai_dubbing.src.strategies import get_strategy, list_available_strategies
 from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.audio_processor import AudioProcessor
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI应用生命周期管理器 - 处理启动和关闭"""
+    # 启动时：清除之前可能残留的关闭标志（重要：支持应用重启）
+    shutdown_flag.clear()
+    
+    # 创建新的任务执行器（重要：支持应用重启）
+    create_task_executor()
+    
+    yield
+    # 关闭时的清理操作
+    print("\n🛑 正在优雅关闭服务器...")
+    try:
+        # 设置关闭标志
+        shutdown_flag.set()
+        
+        # 标记所有正在运行的任务为已取消
+        cancelled_count = 0
+        for task_id in list(running_tasks.keys()):
+            if task_id in tasks:
+                tasks[task_id]["status"] = "cancelled"
+                tasks[task_id]["message"] = "服务器关闭，任务被取消"
+                cancelled_count += 1
+        
+        if cancelled_count > 0:
+            print(f"📋 已标记 {cancelled_count} 个任务为已取消")
+        
+        # 关闭线程池（重要：先等待worker线程停止）
+        print("🔒 正在关闭任务执行器...")
+        safe_shutdown_executor(wait=True)
+        print("✅ 任务执行器已关闭")
+        
+        # 清理GPU内存（重要：在worker线程停止后才清理）
+        print("🧹 正在清理GPU资源...")
+        cleanup_all_engines()
+        print("✅ GPU资源已清理")
+        
+        print("🎉 服务器已优雅关闭")
+        
+    except Exception as e:
+        print(f"❌ 关闭过程中出错: {e}")
+
+app = FastAPI(lifespan=lifespan)
 
 # 获取项目根目录（server.py所在目录）
 PROJECT_ROOT = Path(__file__).parent.resolve()
@@ -39,6 +83,31 @@ app.mount("/results", StaticFiles(directory=str(RESULT_DIR)), name="results")
 
 tasks = {}  # 配音任务
 optimization_tasks = {}  # 字幕优化任务
+running_tasks = {}  # 正在运行的任务线程
+shutdown_flag = threading.Event()  # 关闭标志
+executor_lock = threading.Lock()  # 线程池关闭锁
+task_executor = None  # 线程池执行器（将在启动时创建）
+
+def create_task_executor():
+    """创建新的任务执行器"""
+    global task_executor
+    with executor_lock:
+        # 如果旧的执行器存在且未关闭，先关闭它
+        if task_executor and hasattr(task_executor, '_shutdown') and not task_executor._shutdown:
+            task_executor.shutdown(wait=False)
+        
+        # 创建新的执行器
+        task_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="dubbing-task-")
+        print("✅ 任务执行器已创建")
+
+def safe_shutdown_executor(wait=False):
+    """安全关闭线程池，避免重复关闭"""
+    with executor_lock:
+        if task_executor and hasattr(task_executor, '_shutdown') and not task_executor._shutdown:
+            task_executor.shutdown(wait=wait)
+            print("任务执行器已关闭")
+            return True
+    return False
 
 def resolve_audio_path(path_str: str) -> str:
     """Resolve audio file path relative to project root."""
@@ -170,7 +239,6 @@ async def set_dubbing_config(request: Request):
 
 @app.post("/dubbing")
 async def create_dubbing(
-    background_tasks: BackgroundTasks,
     input_mode: str = Form("file"),  # 新增：输入模式，默认为文件模式
     input_file: UploadFile = File(None),  # 修改：变为可选
     input_text: str = Form(None),  # 新增：文本输入内容
@@ -267,7 +335,16 @@ async def create_dubbing(
 
     output_path = RESULT_DIR / f"{uuid.uuid4().hex}.wav"
 
-    background_tasks.add_task(
+    # 立即注册任务状态（重要：支持排队期间的状态查询和取消）
+    tasks[task_id] = {
+        "status": "queued", 
+        "progress": 0, 
+        "result_url": None, 
+        "message": "任务已接收，等待处理..."
+    }
+
+    # 使用自定义线程池执行任务，以便更好地控制中断
+    task_executor.submit(
         run_dubbing,
         task_id=task_id,
         input_path=input_path,
@@ -288,8 +365,21 @@ def run_subtitle_optimization(
     output_path: Path,
 ):
     """Run the subtitle optimization process and update task status."""
+    
+    def check_optimization_cancellation():
+        """检查字幕优化任务是否应该被取消"""
+        if shutdown_flag.is_set():
+            raise KeyboardInterrupt("服务器正在关闭，任务被取消")
+        if task_id in optimization_tasks and optimization_tasks[task_id].get("status") == "cancelled":
+            raise KeyboardInterrupt("任务被用户取消")
+    
     try:
-        optimization_tasks[task_id] = {"status": "processing", "progress": 0, "result_url": None, "message": "初始化字幕优化..."}
+        # 立即检查是否应该取消
+        check_optimization_cancellation()
+        
+        # 更新任务状态为处理中（从排队状态转换）
+        optimization_tasks[task_id]["status"] = "processing"
+        optimization_tasks[task_id]["message"] = "字幕优化任务开始处理..."
         
         # 导入字幕优化相关模块
         from ai_dubbing.run_optimize_subtitles import optimize_srt_file, load_subtitile_optimize_config
@@ -297,11 +387,17 @@ def run_subtitle_optimization(
         optimization_tasks[task_id]["progress"] = 10
         optimization_tasks[task_id]["message"] = "加载配置文件..."
         
+        # 检查取消状态
+        check_optimization_cancellation()
+        
         # 加载配置
         config = load_subtitile_optimize_config()
         
         optimization_tasks[task_id]["progress"] = 30
         optimization_tasks[task_id]["message"] = "开始字幕优化处理..."
+        
+        # 检查取消状态
+        check_optimization_cancellation()
         
         # 执行字幕优化
         result_path = optimize_srt_file(str(input_path), str(output_path), config)
@@ -314,6 +410,11 @@ def run_subtitle_optimization(
         else:
             raise ValueError("字幕优化失败")
             
+    except KeyboardInterrupt as e:
+        # 处理用户中断或服务器关闭
+        optimization_tasks[task_id]["status"] = "cancelled"
+        optimization_tasks[task_id]["message"] = str(e)
+        print(f"字幕优化任务 {task_id} 被中断: {e}")
     except Exception as e:
         optimization_tasks[task_id]["status"] = "failed"
         optimization_tasks[task_id]["error"] = str(e)
@@ -332,8 +433,22 @@ def run_dubbing(
     emotion_config: dict = None,
 ):
     """Run the dubbing process and update task status."""
+    # 将任务添加到运行任务列表
+    running_tasks[task_id] = threading.current_thread()
+    
+    def check_cancellation():
+        """检查任务是否应该被取消"""
+        if shutdown_flag.is_set():
+            raise KeyboardInterrupt("服务器正在关闭，任务被取消")
+        if task_id in tasks and tasks[task_id].get("status") == "cancelled":
+            raise KeyboardInterrupt("任务被用户取消")
+    
     try:
-        tasks[task_id] = {"status": "processing", "progress": 0, "result_url": None, "message": "Initializing..."}
+        # 立即检查是否应该取消（避免在关闭时执行昂贵的初始化操作）
+        check_cancellation()
+        # 更新任务状态为处理中（从排队状态转换）
+        tasks[task_id]["status"] = "processing"
+        tasks[task_id]["message"] = "任务开始处理..."
         
         config = configparser.ConfigParser()
         config.read(CONFIG_FILE, encoding="utf-8")
@@ -341,6 +456,8 @@ def run_dubbing(
         max_retries = config.getint("并发配置", "tts_max_retries", fallback=2)
 
         def progress_callback(current, total):
+            # 在每次进度更新时检查是否需要取消
+            check_cancellation()
             progress = 50 + int((current / total) * 40)  # Scale progress from 50 to 90
             tasks[task_id]["progress"] = progress
             tasks[task_id]["message"] = f"正在处理第 {current}/{total} 条字幕"
@@ -354,11 +471,15 @@ def run_dubbing(
         is_txt_mode = input_path.suffix.lower() == ".txt"
 
         # 1. Initialize TTS engine
+        check_cancellation()  # 在昂贵的TTS引擎加载前检查取消
         tasks[task_id]["progress"] = 10
+        tasks[task_id]["message"] = "正在初始化TTS引擎"
         tts_engine_instance = get_tts_engine(tts_engine_name)
 
         # 2. Parse file
+        check_cancellation()  # 在文件解析前检查取消
         tasks[task_id]["progress"] = 20
+        tasks[task_id]["message"] = "正在解析输入文件"
         if is_txt_mode:
             parser_instance = TXTParser(language=language)
         else:
@@ -366,12 +487,15 @@ def run_dubbing(
         entries = parser_instance.parse_file(str(input_path))
 
         # 3. Initialize processing strategy
+        check_cancellation()  # 在策略初始化前检查取消
         tasks[task_id]["progress"] = 30
+        tasks[task_id]["message"] = "正在初始化处理策略"
         if is_txt_mode and strategy_name != "basic":
             strategy_name = "basic"
         strategy_instance = get_strategy(strategy_name, tts_engine=tts_engine_instance)
 
         # 4. Generate audio segments
+        check_cancellation()
         tasks[task_id]["progress"] = 50
         tasks[task_id]["message"] = "开始生成音频片段"
         runtime_kwargs = {
@@ -393,22 +517,35 @@ def run_dubbing(
         )
 
         # 5. Merge and export audio
+        check_cancellation()
         tasks[task_id]["progress"] = 90
         tasks[task_id]["message"] = "正在合并音频"
         processor = AudioProcessor()
         merged_audio = processor.merge_audio_segments(
             audio_segments, strategy_name=strategy_name
         )
+        
+        tasks[task_id]["message"] = "正在导出音频文件"
         processor.export_audio(merged_audio, str(output_path))
 
         tasks[task_id]["progress"] = 100
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["result_url"] = f"/results/{output_path.name}"
+        tasks[task_id]["message"] = "任务完成"
 
+    except KeyboardInterrupt as e:
+        # 处理用户中断或服务器关闭
+        tasks[task_id]["status"] = "cancelled"
+        tasks[task_id]["message"] = str(e)
+        print(f"任务 {task_id} 被中断: {e}")
     except Exception as e:
         tasks[task_id]["status"] = "failed"
         tasks[task_id]["error"] = str(e)
         tasks[task_id]["message"] = "处理失败"
+        print(f"任务 {task_id} 失败: {e}")
+    finally:
+        # 从运行任务列表中移除
+        running_tasks.pop(task_id, None)
 
 
 @app.get("/dubbing/status/{task_id}")
@@ -419,6 +556,27 @@ async def get_dubbing_status(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
+@app.post("/dubbing/cancel/{task_id}")
+async def cancel_dubbing_task(task_id: str):
+    """Cancel a dubbing task (queued, running, or processing)."""
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    current_status = tasks[task_id]["status"]
+    
+    # 只有未完成的任务才能取消
+    if current_status in ["completed", "failed", "cancelled"]:
+        return {"status": "failed", "message": f"任务已{current_status}，无法取消"}
+    
+    # 标记任务为取消状态（无论是排队还是运行中）
+    tasks[task_id]["status"] = "cancelled"
+    tasks[task_id]["message"] = "任务已被用户取消"
+    
+    if task_id in running_tasks:
+        return {"status": "success", "message": f"运行中的任务 {task_id} 已标记为取消"}
+    else:
+        return {"status": "success", "message": f"排队中的任务 {task_id} 已标记为取消"}
+
 
 @app.get("/subtitle-optimization/status/{task_id}")
 async def get_optimization_status(task_id: str):
@@ -428,10 +586,27 @@ async def get_optimization_status(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
+@app.post("/subtitle-optimization/cancel/{task_id}")
+async def cancel_optimization_task(task_id: str):
+    """Cancel a subtitle optimization task (queued, running, or processing)."""
+    if task_id not in optimization_tasks:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    current_status = optimization_tasks[task_id]["status"]
+    
+    # 只有未完成的任务才能取消
+    if current_status in ["completed", "failed", "cancelled"]:
+        return {"status": "failed", "message": f"任务已{current_status}，无法取消"}
+    
+    # 标记任务为取消状态（无论是排队还是运行中）
+    optimization_tasks[task_id]["status"] = "cancelled"
+    optimization_tasks[task_id]["message"] = "任务已被用户取消"
+    
+    return {"status": "success", "message": f"字幕优化任务 {task_id} 已标记为取消"}
+
 
 @app.post("/subtitle-optimization")
 async def create_subtitle_optimization(
-    background_tasks: BackgroundTasks,
     input_file: UploadFile = File(...),
 ):
     """Process subtitle optimization and return the optimized file."""
@@ -450,8 +625,16 @@ async def create_subtitle_optimization(
     output_filename = f"optimized_{uuid.uuid4().hex}.srt"
     output_path = RESULT_DIR / output_filename
     
-    # 启动后台任务
-    background_tasks.add_task(
+    # 立即注册任务状态（重要：支持排队期间的状态查询和取消）
+    optimization_tasks[task_id] = {
+        "status": "queued", 
+        "progress": 0, 
+        "result_url": None, 
+        "message": "任务已接收，等待处理..."
+    }
+    
+    # 使用自定义线程池执行任务
+    task_executor.submit(
         run_subtitle_optimization,
         task_id=task_id,
         input_path=input_path,
@@ -473,5 +656,9 @@ async def cleanup_gpu_memory():
 
 if __name__ == "__main__":
     import uvicorn
-
+    
+    print("🚀 AI配音服务器启动中...")
+    print("⚡ 按 Ctrl+C 可优雅关闭服务器")
+    print("-" * 50)
+    
     uvicorn.run(app, host="0.0.0.0", port=8000)
