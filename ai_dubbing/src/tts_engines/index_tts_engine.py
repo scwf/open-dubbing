@@ -1,4 +1,5 @@
 import inspect
+import traceback
 from typing import Tuple, Dict, Any, Optional
 import numpy as np
 import torch
@@ -60,27 +61,33 @@ class IndexTTSEngine(BaseTTSEngine):
         if not voice_reference:
             raise ValueError("必须提供参考语音文件路径 (voice_reference)")
 
-        # 优雅地过滤出底层模型支持的参数，而不是手动pop
-        filtered_kwargs = {
-            key: value for key, value in kwargs.items() 
-            if key in self.valid_infer_params
-        }
+        try:
+            # 优雅地过滤出底层模型支持的参数，而不是手动pop
+            filtered_kwargs = {
+                key: value for key, value in kwargs.items() 
+                if key in self.valid_infer_params
+            }
 
-        sampling_rate, audio_data_int16 = self.tts_model.infer(
-            text=text, audio_prompt=voice_reference, output_path=None, **filtered_kwargs
-        )
-        
-        # 将int16格式的音频数据规范化到 [-1, 1] 的float32格式
-        audio_data_float32 = normalize_audio_data(audio_data_int16)
-        
-        # 标准化采样率为系统默认采样率（与Fish Speech保持一致）
-        if sampling_rate != AUDIO.DEFAULT_SAMPLE_RATE:
-            try:
-                import librosa
-                audio_data_float32 = librosa.resample(audio_data_float32, orig_sr=sampling_rate, target_sr=AUDIO.DEFAULT_SAMPLE_RATE)
-                sampling_rate = AUDIO.DEFAULT_SAMPLE_RATE
-            except ImportError:
-                logger.warning("librosa未安装，跳过重采样，可能导致播放速度异常")
-        
-        return audio_data_float32, sampling_rate
+            sampling_rate, audio_data_int16 = self.tts_model.infer(
+                text=text, audio_prompt=voice_reference, output_path=None, **filtered_kwargs
+            )
+            
+            # 将int16格式的音频数据规范化到 [-1, 1] 的float32格式
+            audio_data_float32 = normalize_audio_data(audio_data_int16)
+            
+            # 标准化采样率为系统默认采样率（与Fish Speech保持一致）
+            if sampling_rate != AUDIO.DEFAULT_SAMPLE_RATE:
+                try:
+                    import librosa
+                    audio_data_float32 = librosa.resample(audio_data_float32, orig_sr=sampling_rate, target_sr=AUDIO.DEFAULT_SAMPLE_RATE)
+                    sampling_rate = AUDIO.DEFAULT_SAMPLE_RATE
+                except ImportError:
+                    logger.warning("librosa未安装，跳过重采样，可能导致播放速度异常")
+            
+            return audio_data_float32, sampling_rate
+            
+        except Exception as e:
+            logger.error(f"IndexTTS推理失败: {str(e)}")
+            logger.error(f"完整错误堆栈:\n{traceback.format_exc()}")
+            raise RuntimeError(f"IndexTTS推理失败: {e}") from e
 
