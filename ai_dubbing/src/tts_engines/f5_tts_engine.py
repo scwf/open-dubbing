@@ -1,4 +1,5 @@
 import inspect
+import traceback
 from typing import Tuple
 import numpy as np
 from .base_engine import BaseTTSEngine
@@ -65,36 +66,42 @@ class F5TTSEngine(BaseTTSEngine):
         # 优先从kwargs中获取参考文本(prompt_text)，如果未提供，再尝试自动转录
         ref_text = kwargs.pop("ref_text")
         if not ref_text:
-            raise ValueError("F5TTS引擎的 `synthesize` 方法需要 'ref_text' 参数。") 
+            raise ValueError("F5TTS引擎的 `synthesize` 方法需要 'ref_text' 参数。")
 
-        # 优雅地过滤出底层模型支持的参数
-        infer_kwargs = {
-            key: value for key, value in kwargs.items() 
-            if key in self.valid_infer_params
-        }
+        try:
+            # 优雅地过滤出底层模型支持的参数
+            infer_kwargs = {
+                key: value for key, value in kwargs.items() 
+                if key in self.valid_infer_params
+            }
 
-        wav, sr, _ = self.tts_model.infer(
-            ref_file=voice_reference,
-            ref_text=ref_text,
-            gen_text=text,
-            **infer_kwargs
-        )
+            wav, sr, _ = self.tts_model.infer(
+                ref_file=voice_reference,
+                ref_text=ref_text,
+                gen_text=text,
+                **infer_kwargs
+            )
 
-        # F5TTS返回的是torch.Tensor，需要转换为numpy array
-        if isinstance(wav, torch.Tensor):
-            wav = wav.cpu().numpy()
+            # F5TTS返回的是torch.Tensor，需要转换为numpy array
+            if isinstance(wav, torch.Tensor):
+                wav = wav.cpu().numpy()
 
-        if wav is None:
-            raise RuntimeError("TTS引擎返回了空的音频数据。")
+            if wav is None:
+                raise RuntimeError("TTS引擎返回了空的音频数据。")
 
-        # 标准化采样率为系统默认采样率（与Fish Speech保持一致）
-        if sr != AUDIO.DEFAULT_SAMPLE_RATE:
-            try:
-                import librosa
-                wav = librosa.resample(wav.astype(np.float32), orig_sr=sr, target_sr=AUDIO.DEFAULT_SAMPLE_RATE)
-                sr = AUDIO.DEFAULT_SAMPLE_RATE
-            except ImportError:
-                logger.warning("librosa未安装，跳过重采样，可能导致播放速度异常")
-        
-        return wav.astype(np.float32), sr
+            # 标准化采样率为系统默认采样率（与Fish Speech保持一致）
+            if sr != AUDIO.DEFAULT_SAMPLE_RATE:
+                try:
+                    import librosa
+                    wav = librosa.resample(wav.astype(np.float32), orig_sr=sr, target_sr=AUDIO.DEFAULT_SAMPLE_RATE)
+                    sr = AUDIO.DEFAULT_SAMPLE_RATE
+                except ImportError:
+                    logger.warning("librosa未安装，跳过重采样，可能导致播放速度异常")
+            
+            return wav.astype(np.float32), sr
+            
+        except Exception as e:
+            logger.error(f"F5TTS推理失败: {str(e)}")
+            logger.error(f"完整错误堆栈:\n{traceback.format_exc()}")
+            raise RuntimeError(f"F5TTS推理失败: {e}") from e
 

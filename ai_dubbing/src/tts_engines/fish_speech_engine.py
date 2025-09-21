@@ -1,4 +1,5 @@
 import inspect
+import traceback
 from typing import Tuple, Dict, Any, Optional
 import numpy as np
 import torch
@@ -210,9 +211,13 @@ class FishSpeechEngine(BaseTTSEngine):
                 raise RuntimeError(f"Fish Speech合成失败: {final_result.error}")
                 
         except ImportError as e:
-            raise RuntimeError(f"Fish Speech schema导入失败: {e}")
+            logger.error(f"Fish Speech schema导入失败: {str(e)}")
+            logger.error(f"完整错误堆栈:\n{traceback.format_exc()}")
+            raise RuntimeError(f"Fish Speech schema导入失败: {e}") from e
         except Exception as e:
-            raise RuntimeError(f"Fish Speech合成过程中出错: {e}")
+            logger.error(f"Fish Speech合成过程中出错: {str(e)}")
+            logger.error(f"完整错误堆栈:\n{traceback.format_exc()}")
+            raise RuntimeError(f"Fish Speech合成过程中出错: {e}") from e
 
 
     @staticmethod

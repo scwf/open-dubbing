@@ -1,4 +1,5 @@
 import inspect
+import traceback
 from typing import Tuple, Dict, Any, Optional, List
 import numpy as np
 import torch
@@ -136,8 +137,9 @@ class IndexTTS2Engine(BaseTTSEngine):
             return audio_data_float32, sampling_rate
             
         except Exception as e:
-            logger.error(f"IndexTTS2推理失败: {e}")
-            raise RuntimeError(f"IndexTTS2推理失败: {e}")
+            logger.error(f"IndexTTS2推理失败: {str(e)}")
+            logger.error(f"完整错误堆栈:\n{traceback.format_exc()}")
+            raise RuntimeError(f"IndexTTS2推理失败: {e}") from e
 
     def _map_emotion_parameters(self, input_kwargs: Dict[str, Any], inference_kwargs: Dict[str, Any]):
         """
