@@ -354,6 +354,10 @@ class LLMContextOptimizer:
         
         self.logger.info(f"时间借用成功: {time_borrowed_count}条字幕")
         self.logger.info(f"需要LLM优化: {len(need_llm_indices)}条字幕")
+
+        if not self.client:
+            self.logger.warning("LLM未配置，将跳过文本简化")
+            return time_optimized, OptimizationReport(len(entries), len(time_optimized), 0, time_borrowed_count, time_decisions)
         
         # 2. 如果需要LLM优化
         llm_optimized = time_optimized

@@ -48,7 +48,7 @@ def get_config_value(config, section, key, default=None, value_type=str):
     except (configparser.NoSectionError, configparser.NoOptionError):
         return default
 
-def load_config_from_file(config_file=None):
+def load_subtitile_optimize_config(config_file=None):
     """从配置文件加载LLM优化配置"""
     if not config_file:
         config_file = str(ai_dubbing_root / "dubbing.conf")
@@ -57,6 +57,8 @@ def load_config_from_file(config_file=None):
     
     # 从字幕优化配置部分读取参数
     llm_config = {
+        'input_file': get_config_value(config, '基本配置', 'input_file'),
+        'output_file': get_config_value(config, '字幕优化配置', 'optimized_srt_output_file'),
         'api_key': get_config_value(config, '字幕优化配置', 'llm_api_key'),
         'model': get_config_value(config, '字幕优化配置', 'llm_model', 'deepseek-chat'),
         'base_url': get_config_value(config, '字幕优化配置', 'base_url', 'https://api.deepseek.com'),
@@ -105,11 +107,7 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
         
         # 初始化LLM优化器
         if not config:
-            config = load_config_from_file()
-        
-        if not config.get('api_key'):
-            logger.error("未配置LLM API密钥，请在 dubbing.conf 文件中设置 llm_api_key")
-            return None
+            config = load_subtitile_optimize_config()
 
         from ai_dubbing.src.optimizer.subtitle_optimizer import LLMContextOptimizer
         optimizer = LLMContextOptimizer(
@@ -152,29 +150,21 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
 
 def main():
     """主函数 - 完全从配置文件读取"""
-    config = load_config()
+    # 从配置文件读取字幕优化配置
+    config = load_subtitile_optimize_config()
     logger = get_logger()
     
     # 从配置文件读取输入文件
-    input_file = get_config_value(config, '基本配置', 'input_file')
+    input_file = config.get('input_file')
     if not input_file:
         logger.error("请在 dubbing.conf 文件的 [基本配置] 部分设置 input_file")
         return 1
     
-    # 从配置文件读取LLM配置
-    llm_config = load_config_from_file()
-    
-    # 检查API密钥
-    if not llm_config.get('api_key'):
-        logger.error("未配置LLM API密钥")
-        logger.info("请在 dubbing.conf 文件的 [字幕优化配置] 部分设置 llm_api_key")
-        return 1
-    
     # 从字幕优化配置读取输出文件（新键名优先，兼容旧键名）
-    output_file = get_config_value(config, '字幕优化配置', 'optimized_srt_output_file')
+    output_file = config.get('output_file')
     
     # 执行优化
-    result = optimize_srt_file(input_file, output_file, llm_config)
+    result = optimize_srt_file(input_file, output_file, config)
     
     if result:
         logger.success("字幕优化成功完成！")
