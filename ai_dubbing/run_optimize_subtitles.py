@@ -153,11 +153,12 @@ def optimize_srt_file(input_path: str, output_path: str = None, config: dict = N
 def main():
     """主函数 - 完全从配置文件读取"""
     config = load_config()
+    logger = get_logger()
     
     # 从配置文件读取输入文件
     input_file = get_config_value(config, '基本配置', 'input_file')
     if not input_file:
-        print("错误: 请在 dubbing.conf 文件的 [基本配置] 部分设置 input_file")
+        logger.error("请在 dubbing.conf 文件的 [基本配置] 部分设置 input_file")
         return 1
     
     # 从配置文件读取LLM配置
@@ -165,8 +166,8 @@ def main():
     
     # 检查API密钥
     if not llm_config.get('api_key'):
-        print("错误: 未配置LLM API密钥")
-        print("请在 dubbing.conf 文件的 [字幕优化配置] 部分设置 llm_api_key")
+        logger.error("未配置LLM API密钥")
+        logger.info("请在 dubbing.conf 文件的 [字幕优化配置] 部分设置 llm_api_key")
         return 1
     
     # 从字幕优化配置读取输出文件（新键名优先，兼容旧键名）
@@ -176,11 +177,11 @@ def main():
     result = optimize_srt_file(input_file, output_file, llm_config)
     
     if result:
-        print(f"\n✅ 字幕优化成功完成！")
-        print(f"📁 优化后文件: {result}")
+        logger.success("字幕优化成功完成！")
+        logger.info(f"优化后文件: {result}")
         return 0
     else:
-        print("\n❌ 字幕优化失败")
+        logger.error("字幕优化失败")
         return 1
 
 if __name__ == "__main__":
