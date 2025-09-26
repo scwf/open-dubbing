@@ -354,6 +354,10 @@ class LLMContextOptimizer:
         
         self.logger.info(f"时间借用成功: {time_borrowed_count}条字幕")
         self.logger.info(f"需要LLM优化: {len(need_llm_indices)}条字幕")
+
+        if not self.client:
+            self.logger.warning("LLM未配置，将跳过文本简化")
+            return time_optimized, OptimizationReport(len(entries), len(time_optimized), 0, time_borrowed_count, time_decisions)
         
         # 2. 如果需要LLM优化
         llm_optimized = time_optimized
@@ -482,7 +486,7 @@ class LLMContextOptimizer:
         ## 任务说明
         当前需要简化的字幕文本时长不足，需要简化文本使其朗读时长能够达到最小时长要求。
 
-        ## 上下文信息
+        ## 当前字幕前后字幕信息，供你参考，确保优化后的字幕和前后字幕保持语义连贯
         {context_text}
 
         ## 需要简化的字幕

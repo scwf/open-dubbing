@@ -292,15 +292,13 @@ def run_subtitle_optimization(
         optimization_tasks[task_id] = {"status": "processing", "progress": 0, "result_url": None, "message": "初始化字幕优化..."}
         
         # 导入字幕优化相关模块
-        from ai_dubbing.run_optimize_subtitles import optimize_srt_file, load_config_from_file
+        from ai_dubbing.run_optimize_subtitles import optimize_srt_file, load_subtitile_optimize_config
         
         optimization_tasks[task_id]["progress"] = 10
         optimization_tasks[task_id]["message"] = "加载配置文件..."
         
         # 加载配置
-        config = load_config_from_file()
-        if not config.get('api_key'):
-            raise ValueError("未配置LLM API密钥，请在配置中设置 llm_api_key")
+        config = load_subtitile_optimize_config()
         
         optimization_tasks[task_id]["progress"] = 30
         optimization_tasks[task_id]["message"] = "开始字幕优化处理..."
