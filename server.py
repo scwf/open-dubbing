@@ -1,68 +1,195 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import List
-import uuid
 import configparser
+import logging
+import tempfile
 import threading
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
-
-from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-from ai_dubbing.src.tts_engines import get_tts_engine, TTS_ENGINES, cleanup_all_engines
-from ai_dubbing.src.strategies import get_strategy, list_available_strategies
-from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.audio_processor import AudioProcessor
+from ai_dubbing.src.parsers import SRTParser, TXTParser
+from ai_dubbing.src.strategies import get_strategy, list_available_strategies
+from ai_dubbing.src.tts_engines import TTS_ENGINES, cleanup_all_engines, get_tts_engine
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """FastAPI应用生命周期管理器 - 处理启动和关闭"""
-    # 启动时：清除之前可能残留的关闭标志（重要：支持应用重启）
-    shutdown_flag.clear()
+logger = logging.getLogger("    Open Dubbing Server")
+
+class ConfigManager:
+    def __init__(self, config_path: Path) -> None:
+        self._config_path = config_path
+        self._lock = threading.RLock()
+
+    def _read_no_lock(self) -> configparser.ConfigParser:
+        config = configparser.ConfigParser()
+        config.read(self._config_path, encoding="utf-8")
+        return config
+
+    def read(self) -> configparser.ConfigParser:
+        with self._lock:
+            return self._read_no_lock()
+
+    def update(self, mutator: Callable[[configparser.ConfigParser], None]) -> None:
+        with self._lock:
+            config = self._read_no_lock()
+            mutator(config)
+            self._write_no_lock(config)
+
+    def _write_no_lock(self, config: configparser.ConfigParser) -> None:
+        self._config_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", delete=False, dir=self._config_path.parent
+        ) as tmp_file:
+            config.write(tmp_file)
+            temp_path = Path(tmp_file.name)
+        temp_path.replace(self._config_path)
+
+
+class TaskStatus(str, Enum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+_FINAL_STATUSES = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
+_SENTINEL = object()
+
+
+@dataclass
+class TaskState:
+    status: TaskStatus = TaskStatus.QUEUED
+    progress: int = 0
+    message: str = ""
+    result_url: Optional[str] = None
+    error: Optional[str] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "status": self.status.value,
+            "progress": self.progress,
+            "message": self.message,
+            "result_url": self.result_url,
+        }
+        if self.error is not None:
+            payload["error"] = self.error
+        return payload
+
+
+@dataclass(frozen=True)
+class CancelResult:
+    success: bool
+    was_running: bool
+    previous_status: TaskStatus
+
+
+class TaskStore:
+    def __init__(self) -> None:
+        self._states: Dict[str, TaskState] = {}
+        self._threads: Dict[str, threading.Thread] = {}
+        self._lock = threading.RLock()
+
+    def create(self, task_id: str, message: str) -> TaskState:
+        with self._lock:
+            state = TaskState(message=message)
+            self._states[task_id] = state
+            return state
+
+    def update(
+        self,
+        task_id: str,
+        *,
+        status: Optional[TaskStatus] = None,
+        progress: Optional[int] = None,
+        message: Optional[str] = None,
+        result_url: Any = _SENTINEL,
+        error: Any = _SENTINEL,
+    ) -> TaskState:
+        with self._lock:
+            state = self._states[task_id]
+            if status is not None:
+                state.status = status
+            if progress is not None:
+                state.progress = progress
+            if message is not None:
+                state.message = message
+            if result_url is not _SENTINEL:
+                state.result_url = result_url
+            if error is not _SENTINEL:
+                state.error = error
+            return state
     
-    # 创建新的任务执行器（重要：支持应用重启）
-    create_task_executor()
-    
-    yield
-    # 关闭时的清理操作
-    print("\n🛑 正在优雅关闭服务器...")
-    try:
-        # 设置关闭标志
-        shutdown_flag.set()
-        
-        # 标记所有正在运行的任务为已取消
-        cancelled_count = 0
-        for task_id in list(running_tasks.keys()):
-            if task_id in tasks:
-                tasks[task_id]["status"] = "cancelled"
-                tasks[task_id]["message"] = "服务器关闭，任务被取消"
-                cancelled_count += 1
-        
-        if cancelled_count > 0:
-            print(f"📋 已标记 {cancelled_count} 个任务为已取消")
-        
-        # 关闭线程池（重要：先等待worker线程停止）
-        print("🔒 正在关闭任务执行器...")
-        safe_shutdown_executor(wait=True)
-        print("✅ 任务执行器已关闭")
-        
-        # 清理GPU内存（重要：在worker线程停止后才清理）
-        print("🧹 正在清理GPU资源...")
-        cleanup_all_engines()
-        print("✅ GPU资源已清理")
-        
-        print("🎉 服务器已优雅关闭")
-        
-    except Exception as e:
-        print(f"❌ 关闭过程中出错: {e}")
+    def update_progress_only(self, task_id: str, progress: int, message: str) -> None:
+        """高频进度更新的优化方法：减少锁持有时间"""
+        with self._lock:
+            state = self._states[task_id]
+            state.progress = progress
+            state.message = message
 
-app = FastAPI(lifespan=lifespan)
+    def attach_thread(self, task_id: str, thread: threading.Thread) -> None:
+        with self._lock:
+            self._threads[task_id] = thread
 
-# 获取项目根目录（server.py所在目录）
+    def detach_thread(self, task_id: str) -> None:
+        with self._lock:
+            self._threads.pop(task_id, None)
+
+    def status(self, task_id: str) -> TaskStatus:
+        with self._lock:
+            return self._states[task_id].status
+
+    def is_cancelled(self, task_id: str) -> bool:
+        return self.status(task_id) == TaskStatus.CANCELLED
+
+    def exists(self, task_id: str) -> bool:
+        with self._lock:
+            return task_id in self._states
+
+    def as_dict(self, task_id: str) -> Dict[str, Any]:
+        with self._lock:
+            return self._states[task_id].as_dict()
+
+    def cancel(self, task_id: str, message: str) -> CancelResult:
+        with self._lock:
+            state = self._states[task_id]
+            previous_status = state.status
+            was_running = task_id in self._threads
+            if previous_status in _FINAL_STATUSES:
+                return CancelResult(False, was_running, previous_status)
+            state.status = TaskStatus.CANCELLED
+            state.message = message
+            return CancelResult(True, was_running, previous_status)
+
+    def cancel_all_pending(self, message: str) -> int:
+        with self._lock:
+            count = 0
+            for state in self._states.values():
+                if state.status in _FINAL_STATUSES:
+                    continue
+                state.status = TaskStatus.CANCELLED
+                state.message = message
+                count += 1
+            return count
+
+
+def ensure_task_not_cancelled(task_store: TaskStore, task_id: str) -> None:
+    if shutdown_flag.is_set():
+        raise KeyboardInterrupt("服务器正在关闭，任务被取消")
+    if task_store.is_cancelled(task_id):
+        raise KeyboardInterrupt("任务被用户取消")
+
+
 PROJECT_ROOT = Path(__file__).parent.resolve()
 
 TEMPLATE_DIR = PROJECT_ROOT / "ai_dubbing/web/templates"
@@ -76,67 +203,178 @@ RESULT_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 CONFIG_FILE = PROJECT_ROOT / "ai_dubbing/dubbing.conf"
+config_manager = ConfigManager(CONFIG_FILE)
 
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-app.mount("/results", StaticFiles(directory=str(RESULT_DIR)), name="results")
 
-tasks = {}  # 配音任务
-optimization_tasks = {}  # 字幕优化任务
-running_tasks = {}  # 正在运行的任务线程
-shutdown_flag = threading.Event()  # 关闭标志
-executor_lock = threading.Lock()  # 线程池关闭锁
-task_executor = None  # 线程池执行器（将在启动时创建）
+shutdown_flag = threading.Event()
+executor_lock = threading.Lock()
+task_executor: Optional[ThreadPoolExecutor] = None
 
-def create_task_executor():
-    """创建新的任务执行器"""
+dubbing_tasks = TaskStore()
+optimization_tasks = TaskStore()
+
+
+def get_task_executor(force_new: bool = False) -> ThreadPoolExecutor:
     global task_executor
     with executor_lock:
-        # 如果旧的执行器存在且未关闭，先关闭它
-        if task_executor and hasattr(task_executor, '_shutdown') and not task_executor._shutdown:
-            task_executor.shutdown(wait=False)
-        
-        # 创建新的执行器
-        task_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="dubbing-task-")
-        print("✅ 任务执行器已创建")
+        executor_closed = bool(task_executor and getattr(task_executor, "_shutdown", False))
+        if force_new or task_executor is None or executor_closed:
+            if task_executor and not executor_closed:
+                task_executor.shutdown(wait=False)
+            task_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="dubbing-task-")
+            logger.info("Task executor created")
+        return task_executor
 
-def safe_shutdown_executor(wait=False):
-    """安全关闭线程池，避免重复关闭"""
+
+def create_task_executor() -> ThreadPoolExecutor:
+    return get_task_executor(force_new=True)
+
+
+def safe_shutdown_executor(wait: bool = False) -> bool:
+    global task_executor
     with executor_lock:
-        if task_executor and hasattr(task_executor, '_shutdown') and not task_executor._shutdown:
+        if task_executor and not getattr(task_executor, "_shutdown", False):
             task_executor.shutdown(wait=wait)
-            print("任务执行器已关闭")
+            logger.info("Task executor shut down")
             return True
     return False
 
+
+async def save_upload_file(upload: UploadFile, destination: Path, chunk_size: int = 1024 * 1024) -> Path:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with open(destination, "wb") as buffer:
+        while True:
+            chunk = await upload.read(chunk_size)
+            if not chunk:
+                break
+            buffer.write(chunk)
+    await upload.seek(0)
+    return destination
+
+
+async def prepare_input_source(
+    input_mode: str,
+    input_file: Optional[UploadFile],
+    input_text: Optional[str],
+    text_format: Optional[str],
+    task_id: str,
+) -> Path:
+    if input_mode == "file":
+        if not input_file:
+            raise HTTPException(status_code=400, detail="文件模式下必须提供输入文件")
+        destination = UPLOAD_DIR / input_file.filename
+        return await save_upload_file(input_file, destination)
+
+    if input_mode == "text":
+        if not input_text or not input_text.strip():
+            raise HTTPException(status_code=400, detail="文本模式下必须提供输入文本")
+        allowed_text_formats = {"txt", "srt"}
+        normalized_text_format = (text_format or "txt").strip().lower()
+        if normalized_text_format not in allowed_text_formats:
+            raise HTTPException(status_code=400, detail="不支持的文本格式")
+        temp_filename = f"temp_{task_id}.{normalized_text_format}"
+        destination = UPLOAD_DIR / temp_filename
+        destination.write_text(input_text.strip(), encoding="utf-8")
+        return destination
+
+    raise HTTPException(status_code=400, detail="不支持的输入模式")
+
+
+async def collect_voice_paths(
+    uploaded_files: List[UploadFile],
+    builtin_files: List[str],
+) -> List[str]:
+    paths: List[str] = []
+    for index, uploaded_file in enumerate(uploaded_files):
+        has_upload = bool(uploaded_file.filename) and (
+            uploaded_file.size is None or uploaded_file.size > 0
+        )
+        if has_upload:
+            destination = UPLOAD_DIR / uploaded_file.filename
+            await save_upload_file(uploaded_file, destination)
+            paths.append(str(destination))
+        elif index < len(builtin_files) and builtin_files[index]:
+            paths.append(resolve_audio_path(builtin_files[index]))
+    return paths
+
+
+def build_emotion_config(
+    tts_engine: str,
+    emotion_mode: str,
+    emotion_audio_path: Optional[Path],
+    emotion_vector: str,
+    emotion_text: str,
+    emotion_alpha: float,
+    use_random: bool,
+) -> Dict[str, Any]:
+    if tts_engine != "index_tts2":
+        return {}
+
+    config: Dict[str, Any] = {
+        "emotion_alpha": emotion_alpha,
+        "use_random": use_random,
+    }
+    if emotion_mode == "audio" and emotion_audio_path:
+        config["emotion_audio_file"] = str(emotion_audio_path)
+    elif emotion_mode == "vector" and emotion_vector:
+        try:
+            config["emotion_vector"] = [float(x.strip()) for x in emotion_vector.split(",")]
+        except ValueError:
+            logger.warning("Invalid emotion vector provided; ignoring value")
+    elif emotion_mode == "text" and emotion_text:
+        config["emotion_text"] = emotion_text
+    elif emotion_mode == "auto":
+        config["auto_emotion"] = True
+    return config
+
+
 def resolve_audio_path(path_str: str) -> str:
-    """Resolve audio file path relative to project root."""
     path = Path(path_str)
     if path.is_absolute():
         return str(path)
-    else:
-        # 相对路径基于项目根目录解析
-        resolved_path = PROJECT_ROOT / path
-        return str(resolved_path)
+    return str(PROJECT_ROOT / path)
+
 
 def resolve_audio_paths_list(paths_str: str) -> str:
-    """Resolve comma-separated audio file paths relative to project root."""
     if not paths_str.strip():
         return ""
-    
-    paths = [path.strip() for path in paths_str.split(',')]
+    paths = [path.strip() for path in paths_str.split(",")]
     resolved_paths = [resolve_audio_path(path) for path in paths if path.strip()]
-    return ','.join(resolved_paths)
+    return ",".join(resolved_paths)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    shutdown_flag.clear()
+    create_task_executor()
+    yield
+    try:
+        logger.info("Shutting down server...")
+        shutdown_flag.set()
+        cancelled = dubbing_tasks.cancel_all_pending("服务器关闭，任务被取消")
+        cancelled += optimization_tasks.cancel_all_pending("服务器关闭，任务被取消")
+        if cancelled:
+            logger.info("Marked %s tasks as cancelled during shutdown", cancelled)
+        if safe_shutdown_executor(wait=True):
+            logger.info("Executor closed")
+        cleanup_all_engines()
+        logger.info("GPU resources cleaned up")
+    except Exception as exc:
+        logger.exception(f"Failed to shutdown server: {str(exc)}")
+
+app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/results", StaticFiles(directory=str(RESULT_DIR)), name="results")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Render the main UI."""
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/dubbing/options")
 async def dubbing_options():
-    """Expose available engines, strategies and languages."""
     languages = ["zh", "en", "ja", "ko"]
     return {
         "tts_engines": list(TTS_ENGINES.keys()),
@@ -144,18 +382,14 @@ async def dubbing_options():
         "languages": languages,
     }
 
+
 @app.get("/dubbing/built-in-audios")
 async def get_built_in_audios():
-    """Get built-in reference audios from dubbing.conf."""
-    config = configparser.ConfigParser()
-    config.read(CONFIG_FILE, encoding="utf-8")
-
+    config = config_manager.read()
     prefix = "内置音频:"
-
-    audio_sections = [s for s in config.sections() if s.startswith(prefix)]
-
+    audio_sections = [section for section in config.sections() if section.startswith(prefix)]
     return {
-        section[len(prefix):]: {
+        section[len(prefix) :]: {
             "path": resolve_audio_path(config.get(section, "path")),
             "text": config.get(section, "text"),
         }
@@ -163,13 +397,11 @@ async def get_built_in_audios():
         if config.has_option(section, "path") and config.has_option(section, "text")
     }
 
+
 @app.get("/dubbing/config")
 async def get_dubbing_config():
-    """Get runtime config from dubbing.conf."""
-    config = configparser.ConfigParser()
-    config.read(CONFIG_FILE, encoding="utf-8")
-    
-    config_data = {
+    config = config_manager.read()
+    return {
         "basic": {
             "voice_files": resolve_audio_paths_list(config.get("基本配置", "voice_files", fallback="")),
             "prompt_texts": config.get("基本配置", "prompt_texts", fallback=""),
@@ -204,52 +436,47 @@ async def get_dubbing_config():
             "emotion_text": config.get("IndexTTS2情感控制", "emotion_text", fallback=""),
             "emotion_alpha": config.getfloat("IndexTTS2情感控制", "emotion_alpha", fallback=0.8),
             "use_random": config.getboolean("IndexTTS2情感控制", "use_random", fallback=False),
-        }
+        },
     }
-    return config_data
 
 
 @app.post("/dubbing/config")
 async def set_dubbing_config(request: Request):
-    """Update runtime config in dubbing.conf."""
     data = await request.json()
-    config = configparser.ConfigParser()
-    config.read(CONFIG_FILE, encoding="utf-8")
 
-    def ensure_section(section):
-        if not config.has_section(section):
-            config.add_section(section)
+    def mutator(config: configparser.ConfigParser) -> None:
+        def ensure_section(section: str) -> None:
+            if not config.has_section(section):
+                config.add_section(section)
 
-    ensure_section("并发配置")
-    for key, value in data["concurrency"].items():
-        config.set("并发配置", key, str(value))
+        ensure_section("并发配置")
+        for key, value in data["concurrency"].items():
+            config.set("并发配置", key, str(value))
 
-    ensure_section("字幕优化配置")
-    for key, value in data["subtitle_optimization"].items():
-        config.set("字幕优化配置", key, str(value))
+        ensure_section("字幕优化配置")
+        for key, value in data["subtitle_optimization"].items():
+            config.set("字幕优化配置", key, str(value))
 
-    ensure_section("时间借用配置")
-    for key, value in data["time_borrowing"].items():
-        config.set("时间借用配置", key, str(value))
+        ensure_section("时间借用配置")
+        for key, value in data["time_borrowing"].items():
+            config.set("时间借用配置", key, str(value))
 
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        config.write(f)
+    config_manager.update(mutator)
     return {"status": "success"}
 
 
 @app.post("/dubbing")
 async def create_dubbing(
-    input_mode: str = Form("file"),  # 新增：输入模式，默认为文件模式
-    input_file: UploadFile = File(None),  # 修改：变为可选
-    input_text: str = Form(None),  # 新增：文本输入内容
-    text_format: str = Form("txt"),  # 新增：文本格式
+    input_mode: str = Form("file"),
+    input_file: UploadFile = File(None),
+    input_text: str = Form(None),
+    text_format: str = Form("txt"),
     upload_voice_files: List[UploadFile] = File(...),
     builtin_voice_files: List[str] = Form(...),
     prompt_texts: List[str] = Form(...),
     tts_engine: str = Form(...),
     strategy: str = Form(...),
     language: str = Form("zh"),
-    # IndexTTS2情感控制参数 (可选)
     emotion_mode: str = Form("auto"),
     emotion_audio_file: UploadFile = File(None),
     emotion_vector: str = Form(""),
@@ -257,50 +484,15 @@ async def create_dubbing(
     emotion_alpha: float = Form(0.8),
     use_random: bool = Form(False),
 ):
-    """Process an upload and return the generated audio path."""
     task_id = uuid.uuid4().hex
-    config = configparser.ConfigParser()
-    config.read(CONFIG_FILE, encoding="utf-8")
+    config = config_manager.read()
     optimized_srt_dir = config.get("字幕优化配置", "optimized_srt_output_file", fallback=None)
 
-    # 验证输入模式和参数
-    if input_mode == "file":
-        if not input_file:
-            raise HTTPException(status_code=400, detail="文件模式下必须提供输入文件")
-        input_path = UPLOAD_DIR / input_file.filename
-        with open(input_path, "wb") as f:
-            f.write(await input_file.read())
-    elif input_mode == "text":
-        if not input_text or not input_text.strip():
-            raise HTTPException(status_code=400, detail="文本模式下必须提供输入文本")
-        
-        allowed_text_formats = {"txt", "srt"}
-        normalized_text_format = (text_format or "").strip().lower()
-        if normalized_text_format not in allowed_text_formats:
-            raise HTTPException(status_code=400, detail="不支持的文本格式")
-        
-        # 创建临时文件保存文本内容
-        temp_filename = f"temp_{task_id}.{normalized_text_format}"
-        input_path = UPLOAD_DIR / temp_filename
-        with open(input_path, "w", encoding="utf-8") as f:
-            f.write(input_text.strip())
-    else:
-        raise HTTPException(status_code=400, detail="不支持的输入模式")
-
+    input_path = await prepare_input_source(input_mode, input_file, input_text, text_format, task_id)
     if optimized_srt_dir and Path(optimized_srt_dir).is_dir():
-        print(f"Optimized SRT would be saved in: {optimized_srt_dir}")
+        logger.info("Optimized SRT would be saved in: %s", optimized_srt_dir)
 
-    # Process voice files, combining new uploads and existing paths
-    final_voice_paths = []
-    for i, uploaded_file in enumerate(upload_voice_files):
-        if uploaded_file.size > 0:
-            file_path = UPLOAD_DIR / uploaded_file.filename
-            with open(file_path, "wb") as f:
-                f.write(await uploaded_file.read())
-            final_voice_paths.append(str(file_path))
-        elif i < len(builtin_voice_files) and builtin_voice_files[i]:
-            path_from_config = resolve_audio_path(builtin_voice_files[i])
-            final_voice_paths.append(path_from_config)
+    final_voice_paths = await collect_voice_paths(upload_voice_files, builtin_voice_files)
 
     if len(final_voice_paths) != len(prompt_texts):
         raise HTTPException(
@@ -308,43 +500,32 @@ async def create_dubbing(
             detail=f"Mismatch between voice files ({len(final_voice_paths)}) and prompts ({len(prompt_texts)}).",
         )
 
-    # 处理IndexTTS2情感音频文件
-    emotion_audio_path = None
-    if tts_engine == "index_tts2" and emotion_mode == "audio" and emotion_audio_file and emotion_audio_file.size > 0:
+    emotion_audio_path: Optional[Path] = None
+    if (
+        tts_engine == "index_tts2"
+        and emotion_mode == "audio"
+        and emotion_audio_file
+        and emotion_audio_file.size is not None
+        and emotion_audio_file.size > 0
+    ):
         emotion_audio_path = UPLOAD_DIR / f"emotion_{uuid.uuid4().hex}_{emotion_audio_file.filename}"
-        with open(emotion_audio_path, "wb") as f:
-            f.write(await emotion_audio_file.read())
+        await save_upload_file(emotion_audio_file, emotion_audio_path)
 
-    # 构建情感配置参数
-    emotion_config = {}
-    if tts_engine == "index_tts2":
-        if emotion_mode == "audio" and emotion_audio_path:
-            emotion_config["emotion_audio_file"] = str(emotion_audio_path)
-        elif emotion_mode == "vector" and emotion_vector:
-            try:
-                emotion_config["emotion_vector"] = [float(x.strip()) for x in emotion_vector.split(',')]
-            except ValueError:
-                pass  # 忽略格式错误，使用默认值
-        elif emotion_mode == "text" and emotion_text:
-            emotion_config["emotion_text"] = emotion_text
-        elif emotion_mode == "auto":
-            emotion_config["auto_emotion"] = True
-        
-        emotion_config["emotion_alpha"] = emotion_alpha
-        emotion_config["use_random"] = use_random
+    emotion_config = build_emotion_config(
+        tts_engine,
+        emotion_mode,
+        emotion_audio_path,
+        emotion_vector,
+        emotion_text,
+        emotion_alpha,
+        use_random,
+    )
 
     output_path = RESULT_DIR / f"{uuid.uuid4().hex}.wav"
+    dubbing_tasks.create(task_id, "任务已接收，等待处理...")
 
-    # 立即注册任务状态（重要：支持排队期间的状态查询和取消）
-    tasks[task_id] = {
-        "status": "queued", 
-        "progress": 0, 
-        "result_url": None, 
-        "message": "任务已接收，等待处理..."
-    }
-
-    # 使用自定义线程池执行任务，以便更好地控制中断
-    task_executor.submit(
+    executor = get_task_executor()
+    executor.submit(
         run_dubbing,
         task_id=task_id,
         input_path=input_path,
@@ -359,66 +540,51 @@ async def create_dubbing(
 
     return {"task_id": task_id}
 
-def run_subtitle_optimization(
-    task_id: str,
-    input_path: Path,
-    output_path: Path,
-):
-    """Run the subtitle optimization process and update task status."""
-    
-    def check_optimization_cancellation():
-        """检查字幕优化任务是否应该被取消"""
-        if shutdown_flag.is_set():
-            raise KeyboardInterrupt("服务器正在关闭，任务被取消")
-        if task_id in optimization_tasks and optimization_tasks[task_id].get("status") == "cancelled":
-            raise KeyboardInterrupt("任务被用户取消")
-    
+
+def run_subtitle_optimization(task_id: str, input_path: Path, output_path: Path) -> None:
+    optimization_tasks.attach_thread(task_id, threading.current_thread())
+
     try:
-        # 立即检查是否应该取消
-        check_optimization_cancellation()
-        
-        # 更新任务状态为处理中（从排队状态转换）
-        optimization_tasks[task_id]["status"] = "processing"
-        optimization_tasks[task_id]["message"] = "字幕优化任务开始处理..."
-        
-        # 导入字幕优化相关模块
-        from ai_dubbing.run_optimize_subtitles import optimize_srt_file, load_subtitile_optimize_config
-        
-        optimization_tasks[task_id]["progress"] = 10
-        optimization_tasks[task_id]["message"] = "加载配置文件..."
-        
-        # 检查取消状态
-        check_optimization_cancellation()
-        
-        # 加载配置
+        ensure_task_not_cancelled(optimization_tasks, task_id)
+        optimization_tasks.update(task_id, status=TaskStatus.PROCESSING, message="字幕优化任务开始处理...")
+
+        from ai_dubbing.run_optimize_subtitles import (
+            load_subtitile_optimize_config,
+            optimize_srt_file,
+        )
+
+        optimization_tasks.update(task_id, progress=10, message="加载配置文件...")
+        ensure_task_not_cancelled(optimization_tasks, task_id)
+
         config = load_subtitile_optimize_config()
-        
-        optimization_tasks[task_id]["progress"] = 30
-        optimization_tasks[task_id]["message"] = "开始字幕优化处理..."
-        
-        # 检查取消状态
-        check_optimization_cancellation()
-        
-        # 执行字幕优化
+
+        optimization_tasks.update(task_id, progress=30, message="开始字幕优化处理...")
+        ensure_task_not_cancelled(optimization_tasks, task_id)
+
         result_path = optimize_srt_file(str(input_path), str(output_path), config)
-        
         if result_path:
-            optimization_tasks[task_id]["progress"] = 100
-            optimization_tasks[task_id]["status"] = "completed"
-            optimization_tasks[task_id]["result_url"] = f"/results/{Path(result_path).name}"
-            optimization_tasks[task_id]["message"] = "字幕优化完成"
+            optimization_tasks.update(
+                task_id,
+                progress=100,
+                status=TaskStatus.COMPLETED,
+                result_url=f"/results/{Path(result_path).name}",
+                message="字幕优化完成",
+            )
         else:
             raise ValueError("字幕优化失败")
-            
-    except KeyboardInterrupt as e:
-        # 处理用户中断或服务器关闭
-        optimization_tasks[task_id]["status"] = "cancelled"
-        optimization_tasks[task_id]["message"] = str(e)
-        print(f"字幕优化任务 {task_id} 被中断: {e}")
-    except Exception as e:
-        optimization_tasks[task_id]["status"] = "failed"
-        optimization_tasks[task_id]["error"] = str(e)
-        optimization_tasks[task_id]["message"] = "字幕优化失败"
+    except KeyboardInterrupt as exc:
+        optimization_tasks.update(task_id, status=TaskStatus.CANCELLED, message=str(exc))
+        logger.info("字幕优化任务 %s cancelled: %s", task_id, exc)
+    except Exception as exc:  # noqa: BLE001
+        optimization_tasks.update(
+            task_id,
+            status=TaskStatus.FAILED,
+            message="字幕优化失败",
+            error=str(exc),
+        )
+        logger.exception("字幕优化任务 %s failed", task_id)
+    finally:
+        optimization_tasks.detach_thread(task_id)
 
 
 def run_dubbing(
@@ -429,76 +595,82 @@ def run_dubbing(
     tts_engine_name: str,
     strategy_name: str,
     language: str = "zh",
-    prompt_texts: List[str] | None = None,
-    emotion_config: dict = None,
-):
-    """Run the dubbing process and update task status."""
-    # 将任务添加到运行任务列表
-    running_tasks[task_id] = threading.current_thread()
-    
-    def check_cancellation():
-        """检查任务是否应该被取消"""
-        if shutdown_flag.is_set():
-            raise KeyboardInterrupt("服务器正在关闭，任务被取消")
-        if task_id in tasks and tasks[task_id].get("status") == "cancelled":
-            raise KeyboardInterrupt("任务被用户取消")
-    
+    prompt_texts: Optional[List[str]] = None,
+    emotion_config: Optional[Dict[str, Any]] = None,
+) -> None:
+    dubbing_tasks.attach_thread(task_id, threading.current_thread())
+
     try:
-        # 立即检查是否应该取消（避免在关闭时执行昂贵的初始化操作）
-        check_cancellation()
-        # 更新任务状态为处理中（从排队状态转换）
-        tasks[task_id]["status"] = "processing"
-        tasks[task_id]["message"] = "任务开始处理..."
-        
-        config = configparser.ConfigParser()
-        config.read(CONFIG_FILE, encoding="utf-8")
+        ensure_task_not_cancelled(dubbing_tasks, task_id)
+        dubbing_tasks.update(task_id, status=TaskStatus.PROCESSING, message="任务开始处理...")
+
+        config = config_manager.read()
         max_concurrency = config.getint("并发配置", "tts_max_concurrency", fallback=1)
         max_retries = config.getint("并发配置", "tts_max_retries", fallback=2)
 
-        def progress_callback(current, total):
-            # 在每次进度更新时检查是否需要取消
-            check_cancellation()
-            progress = 50 + int((current / total) * 40)  # Scale progress from 50 to 90
-            tasks[task_id]["progress"] = progress
-            tasks[task_id]["message"] = f"正在处理第 {current}/{total} 条字幕"
-        
-        if prompt_texts is None:
-            prompt_texts = []
+        # 优化：减少锁操作频率以提升性能
+        last_cancel_check_time = 0.0
+        last_progress_update = 0
 
+        def progress_callback(current: int, total: int) -> None:
+            nonlocal last_cancel_check_time, last_progress_update
+            
+            current_time = time.time()
+            
+            # 优化：减少取消检查频率 - 每2秒最多检查一次，或每10个条目检查一次
+            should_check_cancel = (
+                current_time - last_cancel_check_time > 2.0 or  # 时间间隔限制
+                current % 10 == 0 or  # 条目间隔限制
+                current == total  # 完成时必须检查
+            )
+            
+            if should_check_cancel:
+                ensure_task_not_cancelled(dubbing_tasks, task_id)
+                last_cancel_check_time = current_time
+            
+            # 优化：减少进度更新频率 - 每5个条目或完成时更新
+            should_update_progress = (
+                current % 5 == 0 or  # 每5个条目更新一次
+                current == total or  # 完成时必须更新
+                current - last_progress_update >= 10  # 确保不会超过10个条目不更新
+            )
+            
+            if should_update_progress:
+                progress = 90 if total == 0 else 50 + int((current / total) * 40)
+                # 使用专门的高频更新方法，减少锁持有时间
+                dubbing_tasks.update_progress_only(
+                    task_id, 
+                    progress, 
+                    f"正在处理第 {current}/{total} 条字幕"
+                )
+                last_progress_update = current
+
+        prompt_texts = prompt_texts or []
         if len(voice_paths) != len(prompt_texts):
             raise ValueError("The number of voice files and prompt texts must be the same.")
 
         is_txt_mode = input_path.suffix.lower() == ".txt"
 
-        # 1. Initialize TTS engine
-        check_cancellation()  # 在昂贵的TTS引擎加载前检查取消
-        tasks[task_id]["progress"] = 10
-        tasks[task_id]["message"] = "正在初始化TTS引擎"
+        # 优化：合并快速执行步骤的取消检查
+        ensure_task_not_cancelled(dubbing_tasks, task_id)
+        dubbing_tasks.update(task_id, progress=10, message="正在初始化TTS引擎")
         tts_engine_instance = get_tts_engine(tts_engine_name)
 
-        # 2. Parse file
-        check_cancellation()  # 在文件解析前检查取消
-        tasks[task_id]["progress"] = 20
-        tasks[task_id]["message"] = "正在解析输入文件"
-        if is_txt_mode:
-            parser_instance = TXTParser(language=language)
-        else:
-            parser_instance = SRTParser()
+        # 文件解析通常很快，与TTS引擎初始化合并检查
+        dubbing_tasks.update(task_id, progress=20, message="正在解析输入文件")
+        parser_instance = TXTParser(language=language) if is_txt_mode else SRTParser()
         entries = parser_instance.parse_file(str(input_path))
 
-        # 3. Initialize processing strategy
-        check_cancellation()  # 在策略初始化前检查取消
-        tasks[task_id]["progress"] = 30
-        tasks[task_id]["message"] = "正在初始化处理策略"
+        # 策略初始化很快，合并到音频生成前的最后检查
+        dubbing_tasks.update(task_id, progress=30, message="正在初始化处理策略")
         if is_txt_mode and strategy_name != "basic":
             strategy_name = "basic"
         strategy_instance = get_strategy(strategy_name, tts_engine=tts_engine_instance)
 
-        # 4. Generate audio segments
-        check_cancellation()
-        tasks[task_id]["progress"] = 50
-        tasks[task_id]["message"] = "开始生成音频片段"
-        runtime_kwargs = {
+        # 音频生成前的关键检查点（这是耗时最长的步骤）
+        ensure_task_not_cancelled(dubbing_tasks, task_id)
+        dubbing_tasks.update(task_id, progress=50, message="开始生成音频片段")
+        runtime_kwargs: Dict[str, Any] = {
             "prompt_text": prompt_texts[0] if prompt_texts else "",
             "ref_text": prompt_texts[0] if prompt_texts else "",
             "voice_files": voice_paths,
@@ -507,158 +679,139 @@ def run_dubbing(
             "max_retries": max_retries,
             "progress_callback": progress_callback,
         }
-        
-        # 添加IndexTTS2情感控制参数
         if emotion_config:
-            # 将emotion_config（情感控制参数字典）中的所有键值对，合并到runtime_kwargs参数字典中，用于后续TTS处理时传递情感相关配置
             runtime_kwargs.update(emotion_config)
         audio_segments = strategy_instance.process_entries(
-            entries, voice_reference=voice_paths[0], **runtime_kwargs
+            entries,
+            voice_reference=voice_paths[0] if voice_paths else None,
+            **runtime_kwargs,
         )
 
-        # 5. Merge and export audio
-        check_cancellation()
-        tasks[task_id]["progress"] = 90
-        tasks[task_id]["message"] = "正在合并音频"
+        # 音频处理的最后阶段：合并和导出通常很快，减少中间检查
+        ensure_task_not_cancelled(dubbing_tasks, task_id)
+        dubbing_tasks.update(task_id, progress=90, message="正在合并音频")
         processor = AudioProcessor()
-        merged_audio = processor.merge_audio_segments(
-            audio_segments, strategy_name=strategy_name
-        )
-        
-        tasks[task_id]["message"] = "正在导出音频文件"
+        merged_audio = processor.merge_audio_segments(audio_segments, strategy_name=strategy_name)
+
+        dubbing_tasks.update(task_id, message="正在导出音频文件")
         processor.export_audio(merged_audio, str(output_path))
 
-        tasks[task_id]["progress"] = 100
-        tasks[task_id]["status"] = "completed"
-        tasks[task_id]["result_url"] = f"/results/{output_path.name}"
-        tasks[task_id]["message"] = "任务完成"
-
-    except KeyboardInterrupt as e:
-        # 处理用户中断或服务器关闭
-        tasks[task_id]["status"] = "cancelled"
-        tasks[task_id]["message"] = str(e)
-        print(f"任务 {task_id} 被中断: {e}")
-    except Exception as e:
-        tasks[task_id]["status"] = "failed"
-        tasks[task_id]["error"] = str(e)
-        tasks[task_id]["message"] = "处理失败"
-        print(f"任务 {task_id} 失败: {e}")
+        dubbing_tasks.update(
+            task_id,
+            status=TaskStatus.COMPLETED,
+            progress=100,
+            result_url=f"/results/{output_path.name}",
+            message="任务完成",
+        )
+    except KeyboardInterrupt as exc:
+        dubbing_tasks.update(task_id, status=TaskStatus.CANCELLED, message=str(exc))
+        logger.info("配音任务 %s cancelled: %s", task_id, exc)
+    except Exception as exc:  # noqa: BLE001
+        dubbing_tasks.update(
+            task_id,
+            status=TaskStatus.FAILED,
+            message="处理失败",
+            error=str(exc),
+        )
+        logger.exception("配音任务 %s failed", task_id)
     finally:
-        # 从运行任务列表中移除
-        running_tasks.pop(task_id, None)
+        dubbing_tasks.detach_thread(task_id)
 
 
 @app.get("/dubbing/status/{task_id}")
 async def get_dubbing_status(task_id: str):
-    """Get the status of a dubbing task."""
-    task = tasks.get(task_id)
-    if not task:
+    if not dubbing_tasks.exists(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return dubbing_tasks.as_dict(task_id)
+
 
 @app.post("/dubbing/cancel/{task_id}")
 async def cancel_dubbing_task(task_id: str):
-    """Cancel a dubbing task (queued, running, or processing)."""
-    if task_id not in tasks:
+    if not dubbing_tasks.exists(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
-    
-    current_status = tasks[task_id]["status"]
-    
-    # 只有未完成的任务才能取消
-    if current_status in ["completed", "failed", "cancelled"]:
-        return {"status": "failed", "message": f"任务已{current_status}，无法取消"}
-    
-    # 标记任务为取消状态（无论是排队还是运行中）
-    tasks[task_id]["status"] = "cancelled"
-    tasks[task_id]["message"] = "任务已被用户取消"
-    
-    if task_id in running_tasks:
-        return {"status": "success", "message": f"运行中的任务 {task_id} 已标记为取消"}
-    else:
-        return {"status": "success", "message": f"排队中的任务 {task_id} 已标记为取消"}
+
+    result = dubbing_tasks.cancel(task_id, "任务已被用户取消")
+    if not result.success:
+        return {
+            "status": "failed",
+            "message": f"任务已{result.previous_status.value}，无法取消",
+        }
+
+    return {
+        "status": "success",
+        "message": (
+            f"运行中的任务 {task_id} 已标记为取消"
+            if result.was_running
+            else f"排队中的任务 {task_id} 已标记为取消"
+        ),
+    }
 
 
 @app.get("/subtitle-optimization/status/{task_id}")
 async def get_optimization_status(task_id: str):
-    """Get the status of a subtitle optimization task."""
-    task = optimization_tasks.get(task_id)
-    if not task:
+    if not optimization_tasks.exists(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return optimization_tasks.as_dict(task_id)
+
 
 @app.post("/subtitle-optimization/cancel/{task_id}")
 async def cancel_optimization_task(task_id: str):
-    """Cancel a subtitle optimization task (queued, running, or processing)."""
-    if task_id not in optimization_tasks:
+    if not optimization_tasks.exists(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
-    
-    current_status = optimization_tasks[task_id]["status"]
-    
-    # 只有未完成的任务才能取消
-    if current_status in ["completed", "failed", "cancelled"]:
-        return {"status": "failed", "message": f"任务已{current_status}，无法取消"}
-    
-    # 标记任务为取消状态（无论是排队还是运行中）
-    optimization_tasks[task_id]["status"] = "cancelled"
-    optimization_tasks[task_id]["message"] = "任务已被用户取消"
-    
-    return {"status": "success", "message": f"字幕优化任务 {task_id} 已标记为取消"}
+
+    result = optimization_tasks.cancel(task_id, "任务已被用户取消")
+    if not result.success:
+        return {
+            "status": "failed",
+            "message": f"任务已{result.previous_status.value}，无法取消",
+        }
+
+    return {
+        "status": "success",
+        "message": f"字幕优化任务 {task_id} 已标记为取消",
+    }
 
 
 @app.post("/subtitle-optimization")
-async def create_subtitle_optimization(
-    input_file: UploadFile = File(...),
-):
-    """Process subtitle optimization and return the optimized file."""
-    task_id = uuid.uuid4().hex
-    
-    # 检查文件类型
-    if not input_file.filename.lower().endswith('.srt'):
+async def create_subtitle_optimization(input_file: UploadFile = File(...)):
+    if not input_file.filename.lower().endswith(".srt"):
         raise HTTPException(status_code=400, detail="仅支持.srt格式的字幕文件")
-    
-    # 保存上传的文件
+
+    task_id = uuid.uuid4().hex
     input_path = UPLOAD_DIR / input_file.filename
-    with open(input_path, "wb") as f:
-        f.write(await input_file.read())
-    
-    # 生成输出文件路径
+    await save_upload_file(input_file, input_path)
+
     output_filename = f"optimized_{uuid.uuid4().hex}.srt"
     output_path = RESULT_DIR / output_filename
-    
-    # 立即注册任务状态（重要：支持排队期间的状态查询和取消）
-    optimization_tasks[task_id] = {
-        "status": "queued", 
-        "progress": 0, 
-        "result_url": None, 
-        "message": "任务已接收，等待处理..."
-    }
-    
-    # 使用自定义线程池执行任务
-    task_executor.submit(
+
+    optimization_tasks.create(task_id, "任务已接收，等待处理...")
+
+    executor = get_task_executor()
+    executor.submit(
         run_subtitle_optimization,
         task_id=task_id,
         input_path=input_path,
         output_path=output_path,
     )
-    
+
     return {"task_id": task_id}
 
 
 @app.post("/dubbing/cleanup")
 async def cleanup_gpu_memory():
-    """手动清理所有TTS引擎的GPU内存"""
     try:
         cleanup_all_engines()
         return {"status": "success", "message": "GPU内存已清理"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"清理GPU内存失败: {str(e)}")
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("GPU cleanup failed")
+        raise HTTPException(status_code=500, detail=f"清理GPU内存失败: {str(exc)}") from exc
 
 
 if __name__ == "__main__":
     import uvicorn
-    
-    print("🚀 AI配音服务器启动中...")
-    print("⚡ 按 Ctrl+C 可优雅关闭服务器")
-    print("-" * 50)
-    
+
+    if not logger.handlers:
+        logging.basicConfig(level=logging.INFO)
+
+    logger.info("Starting AI dubbing server...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
