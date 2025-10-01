@@ -23,7 +23,7 @@ from ai_dubbing.src.parsers import SRTParser, TXTParser
 from ai_dubbing.src.strategies import get_strategy, list_available_strategies
 from ai_dubbing.src.tts_engines import TTS_ENGINES, cleanup_all_engines, get_tts_engine
 
-logger = logging.getLogger("    Open Dubbing Server")
+logger = logging.getLogger("Open Dubbing Server")
 
 class ConfigManager:
     def __init__(self, config_path: Path) -> None:
