@@ -22,6 +22,7 @@ class SRTDubbingLogger:
     def __init__(self, name: str = "srt_dubbing", log_level: str = "INFO"):
         self.logger = logging.getLogger(name)
         self.logger.setLevel(getattr(logging, log_level.upper()))
+        self.logger.propagate = False  # prevent duplicate writes via root logger
         
         # 避免重复添加handler
         if not self.logger.handlers:
