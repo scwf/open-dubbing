@@ -761,6 +761,38 @@ body {
   background: #059669;
 }
 
+/* Audio Player Container */
+.audio-player-container {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  backdrop-filter: blur(5px);
+}
+
+.audio-player-container audio {
+  width: 100%;
+  height: 50px;
+  border-radius: 8px;
+  outline: none;
+}
+
+/* Webkit audio player styling */
+.audio-player-container audio::-webkit-media-controls-panel {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(240, 244, 255, 0.9) 100%);
+  border-radius: 8px;
+}
+
+.audio-player-container audio::-webkit-media-controls-play-button {
+  background-color: #667eea;
+  border-radius: 50%;
+}
+
+.audio-player-container audio::-webkit-media-controls-current-time-display,
+.audio-player-container audio::-webkit-media-controls-time-remaining-display {
+  color: #333;
+}
+
 /* Footer */
 .footer {
   text-align: center;

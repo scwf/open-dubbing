@@ -1016,6 +1016,14 @@ async function loadConfig() {
     ui.downloadLink.href = resultUrl;
     ui.downloadLink.download = fileName;
     
+    // 设置音频播放器源（仅配音任务有音频播放器）
+    if (taskType === 'dubbing') {
+      const audioPlayer = document.getElementById('dubbing-audio-player');
+      console.log('设置音频播放器:', { audioPlayer, resultUrl });
+      audioPlayer.src = resultUrl;
+      audioPlayer.load();
+    }
+    
     // 显示结果区域，隐藏进度条
     ui.resultSection.style.display = 'block';
     ui.progressContainer.style.display = 'none';
@@ -1048,6 +1056,15 @@ async function loadConfig() {
     
     // 重置进度条
     updateTaskProgress(taskType, 0);
+    
+    // 重置音频播放器（仅配音任务）
+    if (taskType === 'dubbing') {
+      const audioPlayer = document.getElementById('dubbing-audio-player');
+      if (audioPlayer) {
+        audioPlayer.pause();
+        audioPlayer.src = '';
+      }
+    }
     
     // 隐藏结果区域
     ui.resultSection.style.display = 'none';
