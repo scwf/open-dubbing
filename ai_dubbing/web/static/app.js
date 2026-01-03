@@ -1019,9 +1019,10 @@ async function loadConfig() {
     // 设置音频播放器源（仅配音任务有音频播放器）
     if (taskType === 'dubbing') {
       const audioPlayer = document.getElementById('dubbing-audio-player');
-      console.log('设置音频播放器:', { audioPlayer, resultUrl });
-      audioPlayer.src = resultUrl;
-      audioPlayer.load();
+      if (audioPlayer && resultUrl) {
+        audioPlayer.src = resultUrl;
+        audioPlayer.load();
+      }
     }
     
     // 显示结果区域，隐藏进度条
