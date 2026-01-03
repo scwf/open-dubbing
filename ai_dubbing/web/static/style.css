@@ -615,10 +615,17 @@ body {
   text-align: center;
 }
 
-.task-status-section .result-content i {
+.task-status-section .result-content > i.success-icon {
   color: #10b981;
   font-size: 3rem;
   margin-bottom: 0.75rem;
+}
+
+/* 下载按钮中的图标样式 */
+.task-status-section .download-btn i {
+  color: white;
+  font-size: 1rem;
+  margin-bottom: 0;
 }
 
 .task-status-section .result-section .result-content h3 {
