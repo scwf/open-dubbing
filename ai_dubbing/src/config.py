@@ -161,7 +161,7 @@ class F5TTSConfig:
 
 class CosyVoiceConfig:
     """CosyVoice引擎专用配置"""
-    MODEL_ID = str(MODEL_CACHE_DIR / 'CosyVoice2-0.5B')
+    MODEL_ID = str(MODEL_CACHE_DIR / 'Fun-CosyVoice3-0.5B')
     PROMPT_TEXT = None
     FP16 = False
     LOAD_JIT = False

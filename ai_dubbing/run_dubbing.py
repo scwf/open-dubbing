@@ -6,6 +6,8 @@
 """
 
 import configparser
+import argparse
+import logging
 import os
 import sys
 import time
@@ -32,7 +34,35 @@ from ai_dubbing.src.logger import setup_logging, create_process_logger, get_logg
 # 初始化项目环境
 setup_project_path()
 
-def load_config(config_file=str(current_file.parent)+"/dubbing.conf"):
+
+def configure_external_loggers() -> None:
+    """Lower noisy third-party debug loggers without muting normal app logs."""
+    noisy_loggers = [
+        "urllib3",
+        "requests",
+        "modelscope",
+        "modelscope.hub",
+        "numba",
+        "numba.core",
+        "numba.core.byteflow",
+        "numba.core.interpreter",
+        "numba.core.ssa",
+    ]
+    for name in noisy_loggers:
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.INFO)
+
+def parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description="基于配置文件的SRT配音工具")
+    parser.add_argument(
+        "--config",
+        default=str(current_file.parent / "dubbing.conf"),
+        help="配置文件路径（默认：ai_dubbing/dubbing.conf）",
+    )
+    return parser.parse_args()
+
+def load_config(config_file):
     """加载配置文件，返回配置字典"""
     if not os.path.exists(config_file):
         # 创建简单logger用于配置文件不存在的错误
@@ -188,9 +218,11 @@ def _get_common_emotion_params(config, section_name):
 
 def main():
     """主函数：完全遵循cli.py的精确结构和逻辑"""
-    
+    args = parse_args()
+    configure_external_loggers()
+
     # 加载配置
-    config = load_config()
+    config = load_config(args.config)
     
     # 解析配置参数（映射到cli.py的参数）
     input_file = get_config_value(config, '基本配置', 'input_file')

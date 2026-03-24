@@ -49,7 +49,11 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 print_info "Cloning and installing CosyVoice engine..."
 mkdir -p "${DEPS_DIR}"
 if [ -d "${COSYVOICE_DIR}" ]; then
-    echo "CosyVoice directory already exists. Skipping clone."
+    echo "CosyVoice directory already exists. Updating via git pull..."
+    cd "${COSYVOICE_DIR}"
+    git pull origin main
+    git submodule update --init --recursive
+    cd "${PROJECT_DIR}"
 else
     git clone --recursive "${COSYVOICE_REPO}" "${COSYVOICE_DIR}"
 fi
@@ -96,11 +100,7 @@ try:
     os.makedirs(model_dir, exist_ok=True)
     
     models = [
-        ('iic/CosyVoice2-0.5B', 'cosyvoice-2-0.5b'),
-        ('iic/CosyVoice-300M', 'cosyvoice-300m'),
-        ('iic/CosyVoice-300M-SFT', 'cosyvoice-300m-sft'),
-        ('iic/CosyVoice-300M-Instruct', 'cosyvoice-300m-instruct'),
-        ('iic/CosyVoice-ttsfrd', 'cosyvoice-ttsfrd')
+        ('FunAudioLLM/Fun-CosyVoice3-0.5B-2512', 'Fun-CosyVoice3-0.5B')
     ]
     
     for model_id, local_name in models:
