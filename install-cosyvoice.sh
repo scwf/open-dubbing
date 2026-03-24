@@ -53,7 +53,7 @@ if [ -d "${COSYVOICE_DIR}" ]; then
     cd "${COSYVOICE_DIR}"
     git pull origin main
     git submodule update --init --recursive
-    cd ..
+    cd "${PROJECT_DIR}"
 else
     git clone --recursive "${COSYVOICE_REPO}" "${COSYVOICE_DIR}"
 fi
