@@ -20,16 +20,18 @@ class CosyVoiceEngine(BaseTTSEngine):
         :param config: 引擎配置
         """
         # 动态导入CosyVoice，如果不存在则给出友好提示
-        from cosyvoice.cli.cosyvoice import CosyVoice2
+        from cosyvoice.cli.cosyvoice import AutoModel
 
         init_kwargs = CosyVoiceConfig.get_init_kwargs()
-        # 过滤掉值为None的参数
-        init_kwargs = {k: v for k, v in init_kwargs.items() if v is not None}
+        # 对于 CosyVoice 3 仅需要保留 model_dir
+        model_dir = init_kwargs.get("model_dir")
+        if not model_dir:
+            raise ValueError("CosyVoice的初始化必须在 .env 或配置中指定 model_dir (如 models/Fun-CosyVoice3-0.5B)")
         
-        logger.step("加载CosyVoice模型...")
+        logger.step(f"加载CosyVoice模型 (model_dir={model_dir})...")
         try:
-            self.tts_model = CosyVoice2(**init_kwargs)
-            logger.success(f"模型加载成功: {init_kwargs}")
+            self.tts_model = AutoModel(model_dir=model_dir)
+            logger.success("模型加载成功!")
 
             # 使用内省机制，获取底层模型真正支持的参数列表
             infer_signature = inspect.signature(self.tts_model.inference_zero_shot)
@@ -60,9 +62,9 @@ class CosyVoiceEngine(BaseTTSEngine):
             raise ValueError("必须提供参考语音文件路径 (voice_reference)")
 
         try:
-            # CosyVoice 需要 16k 采样率的 prompt 音频
-            from cosyvoice.utils.file_utils import load_wav
-            prompt_speech_16k = load_wav(voice_reference, 16000)
+            # CosyVoice 3 zero_shot 建议增加 system prompt
+            if "<|endofprompt|>" not in prompt_text:
+                prompt_text = f"You are a helpful assistant.<|endofprompt|>{prompt_text}"
 
             # 优雅地过滤出底层模型支持的、且非核心的参数
             filtered_kwargs = {
@@ -71,8 +73,8 @@ class CosyVoiceEngine(BaseTTSEngine):
             }
 
             output_speech_list = []
-            # CosyVoice 的推理接口是生成器模式
-            for speech in self.tts_model.inference_zero_shot(text, prompt_text, prompt_speech_16k):
+            # CosyVoice 3 的推理接口第三个参数直接传递路径字符串即可
+            for speech in self.tts_model.inference_zero_shot(text, prompt_text, voice_reference, stream=False):
                 # 将输出的tensor移动到CPU并转换为numpy
                 output_speech_list.append(speech['tts_speech'].cpu())
             
