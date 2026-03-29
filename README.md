@@ -81,6 +81,23 @@ git clone --recursive git@github.com:scwf/open-dubbing.git
 cd open-dubbing
 ```
 
+如果在克隆过程中遇到 `deps/index-tts` 的 Git LFS 下载失败（例如上游 LFS 配额临时超限），可以临时跳过 LFS smudge：
+
+Windows PowerShell:
+
+```powershell
+$env:GIT_LFS_SKIP_SMUDGE=1
+git clone --recursive git@github.com:scwf/open-dubbing.git
+cd open-dubbing
+```
+
+Linux / macOS:
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone --recursive git@github.com:scwf/open-dubbing.git
+cd open-dubbing
+```
+
 如果已经 clone 过主仓库，再执行一次：
 
 ```bash
