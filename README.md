@@ -71,7 +71,7 @@ open-dubbing/
 | 路径 | 上游仓库 | 固定 commit |
 | --- | --- | --- |
 | `deps/CosyVoice` | `https://github.com/FunAudioLLM/CosyVoice` | `ace7c47f41bbd303aa6bf1ea80e6f9fbd595cd40` |
-| `deps/fish-speech` | `https://github.com/fishaudio/fish-speech` | `19308b308347198a834651fccd755964246c7d0b` |
+| `deps/fish-speech` | `https://github.com/scwf/fish-speech` | `f6ea881c3a0de40d1943965c46df1dbaf2139ec4` |
 | `deps/index-tts` | `https://github.com/index-tts/index-tts` | `db5b39bb6ad903c219b2dd33d60b0f0bdaede664` |
 
 推荐使用带 submodule 的方式克隆：

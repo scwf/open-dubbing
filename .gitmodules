@@ -3,7 +3,7 @@
 	url = https://github.com/FunAudioLLM/CosyVoice.git
 [submodule "deps/fish-speech"]
 	path = deps/fish-speech
-	url = https://github.com/fishaudio/fish-speech.git
+	url = https://github.com/scwf/fish-speech.git
 [submodule "deps/index-tts"]
 	path = deps/index-tts
 	url = https://github.com/index-tts/index-tts.git
