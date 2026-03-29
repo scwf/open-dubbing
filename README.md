@@ -28,7 +28,7 @@ open-dubbing/
 ├── server.py                  # Web UI 服务启动脚本
 ├── requirements.txt           # Python 依赖包
 ├── ai_dubbing/
-│   ├── run_dubbing.py            # [入口] 基于配置文件的配音任务
+│   ├── run_dubbing.py            # [入口] 基于命令行参数的配音任务
 │   ├── run_optimize_subtitles.py # [入口] 基于配置文件的字幕优化任务（翻译后的中文字幕时长不合理的问题）
 │   ├── dubbing.conf.example   # 配置文件模板
 │   ├── web/
@@ -168,78 +168,56 @@ Web UI 主要分为以下几个功能区域：
         *   **情感模式**: 自动分析、音频提示、情感向量、文本描述四种模式
         *   **情感强度**: 可调节情感表达的强烈程度 (0.0-1.0)
         *   **随机采样**: 增加语音的自然变化
-    *   所有配置修改后，可点击 **"保存配置"** 将其写入 `dubbing.conf` 文件，以便命令行或其他方式复用。
+    *   所有配置修改后，可点击 **"保存配置"** 将其写入 `dubbing.conf` 文件，便于 Web 端或其他配置文件流程复用。
 
 4.  **开始处理**:
     *   所有参数设置完毕后，点击 **“开始配音”** 按钮启动任务。
     *   处理过程中，页面会实时显示任务进度。完成后，会提供最终音频文件的下载链接。
 
-### python脚本方式运行（备选）
+### python脚本方式运行模式(给第三方程序调用或者AI Agent调用)
 
-#### 1. 创建配置文件
-复制配置文件模板并修改：
+#### 1. 直接传入命令行参数
 
 ```bash
-cp ai_dubbing/dubbing.conf.example ai_dubbing/dubbing.conf
+python ai_dubbing/run_dubbing.py \
+  --input-file "subtitles/movie.srt" \
+  --output-file "output/movie_dubbed.wav"
 ```
 
-#### 2. 编辑配置文件
-修改 `ai_dubbing/dubbing.conf` 中的参数：
+常用参数说明：
 
-```ini
-# SRT配音工具配置文件
-# 复制此文件并根据实际需求修改参数
-
-[基本配置]
-# 输入文件路径（SRT或TXT，必须指定）
-input_file = subtitles/movie.srt
-
-# 参考语音文件路径（支持 wav/mp3，多条用逗号分隔）
-voice_files = voices/ref1.wav, voices/ref2.mp3
-
-# 参考音频对应文本（与 voice_files 一一对应，文本使用双引号包裹）
-prompt_texts = "这是第一段参考音频文本", "这是第二段参考音频文本"
-
-# 输出音频文件路径（默认：output.wav）
-output_file = output/movie_dubbed.wav
-
-# TTS引擎选择：fish_speech, index_tts2, f5_tts, cosy_voice
-tts_engine = fish_speech
-
-# 时间同步策略：stretch, basic
-# 注意：TXT文件模式下系统会自动使用basic策略
-strategy = stretch
-
-[高级配置]
-# 语言设置：zh, en, ja, ko（TXT模式专用）
-language = zh
-
-[IndexTTS2情感控制]
-# 情感控制模式：auto(自动), audio(音频提示), vector(情感向量), text(文本描述)
-emotion_mode = auto
-
-# 情感音频文件路径（emotion_mode = audio 时使用）
-emotion_audio_file = emotions/happy.wav
-
-# 情感向量（emotion_mode = vector 时使用，8个数值，逗号分隔）
-emotion_vector = 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8
-
-# 情感文本描述（emotion_mode = text 时使用）
-emotion_text = 开心愉悦的语调
-
-# 情感强度（0.0-1.0，默认0.8）
-emotion_alpha = 0.8
-
-# 是否使用随机采样（增加自然变化，默认false）
-use_random = false
+```text
+--input-file             输入文件路径（SRT 或 TXT，必填）
+--output-file            输出音频文件路径（必填）
+--voice-files            参考音频列表；默认使用内置 mcs 音频
+--prompt-texts           参考文本列表；默认使用内置 mcs 参考文本
+--tts-engine             可选：index_tts2, fish_speech, f5_tts, cosy_voice；默认 index_tts2
+--strategy               可选：stretch, basic；未传时自动选择（SRT=stretch，TXT=basic）
+--emotion-text           IndexTTS2 文本情感描述，默认“平静”
+--emotion-alpha          情感强度，默认 0.5
 ```
 
-#### 3. 运行配音
+如果你要覆盖默认参考音频/文本，可以这样传：
+
 ```bash
-python ai_dubbing/run_dubbing.py
+python ai_dubbing/run_dubbing.py \
+  --input-file "subtitles/movie.srt" \
+  --output-file "output/movie_dubbed.wav" \
+  --voice-files "voices/ref1.wav" "voices/ref2.mp3" \
+  --prompt-texts "这是第一段参考音频文本" "这是第二段参考音频文本" \
+  --tts-engine index_tts2 \
+  --emotion-text "平静、克制" \
+  --emotion-alpha 0.5
 ```
 
-#### IndexTTS2 与 WSL 启动注意事项
+策略默认会按输入类型自动决定：
+
+```text
+SRT / 字幕文件 -> stretch
+TXT / 纯文本文件 -> basic
+```
+
+#### IndexTTS2启动注意事项
 
 需要注意的是，社区版 `index-tts` 在加载 `w2v-bert`、`MaskGCT`、`campplus`、`bigvgan` 等辅助依赖时，会使用相对路径 `./checkpoints/hf_cache` 作为缓存目录。因此必须先切换到预期的工作目录，否则这些缓存可能会落到当前目录对应的 `./checkpoints/hf_cache` 下，并触发重复下载。
 
@@ -247,13 +225,15 @@ python ai_dubbing/run_dubbing.py
 
 ```bash
 cd /home/xiaofei/code/open-dubbing
-python ai_dubbing/run_dubbing.py --config /mnt/c/path/to/dubbing.conf
+python ai_dubbing/run_dubbing.py \
+  --input-file "/mnt/c/path/to/input.srt" \
+  --output-file "/mnt/c/path/to/output.wav"
 ```
 
 如果从 Windows 侧调用 `wsl.exe`，也建议显式先 `cd`：
 
 ```bash
-wsl.exe -e bash -lc "cd /home/xiaofei/code/open-dubbing && conda run -n fish-speech --no-capture-output python /home/xiaofei/code/open-dubbing/ai_dubbing/run_dubbing.py --config /mnt/c/path/to/dubbing.conf"
+wsl.exe -e bash -lc "cd /home/xiaofei/code/open-dubbing && conda run -n fish-speech --no-capture-output python /home/xiaofei/code/open-dubbing/ai_dubbing/run_dubbing.py --input-file /mnt/c/path/to/input.srt --output-file /mnt/c/path/to/output.wav"
 ```
 
 ### 仅优化字幕（不合成音频）

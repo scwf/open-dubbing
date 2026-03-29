@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """
-基于配置文件的SRT配音工具
-
-通过读取dubbing.conf配置文件来执行配音任务，完全遵循cli.py的结构和逻辑。
+通过命令行参数运行的 SRT/TXT 配音工具。
 """
 
-import configparser
 import argparse
 import logging
 import os
@@ -24,15 +21,26 @@ if project_root_str not in sys.path:
 
 # 使用绝对导入
 from ai_dubbing.src.utils import setup_project_path
-from ai_dubbing.src.config import PATH
 from ai_dubbing.src.parsers import SRTParser, TXTParser
-from ai_dubbing.src.strategies import get_strategy, list_available_strategies, get_strategy_description
+from ai_dubbing.src.strategies import get_strategy, list_available_strategies
 from ai_dubbing.src.tts_engines import get_tts_engine, TTS_ENGINES
 from ai_dubbing.src.audio_processor import AudioProcessor
 from ai_dubbing.src.logger import setup_logging, create_process_logger, get_logger
 
 # 初始化项目环境
 setup_project_path()
+
+DEFAULT_VOICE_FILE = str(project_root / "refer_voice" / "mcs.mp3")
+DEFAULT_PROMPT_TEXT = (
+    "很多人可能觉得，这不简单吗？把我们现有的函数或者API接口直接开放给智能体不就行了？"
+    "但事实证明，这条路往往走不通。为什么呢？因为我们必须明白一个核心前提："
+    "智能体“看见”和“使用”工具的方式，和我们人类开发者是完全不同的。"
+)
+DEFAULT_LANGUAGE = "zh"
+DEFAULT_TTS_ENGINE = "index_tts2"
+DEFAULT_TTS_MAX_RETRIES = 2
+DEFAULT_EMOTION_TEXT = "平静"
+DEFAULT_EMOTION_ALPHA = 0.5
 
 
 def configure_external_loggers() -> None:
@@ -54,188 +62,95 @@ def configure_external_loggers() -> None:
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description="基于配置文件的SRT配音工具")
-    parser.add_argument(
-        "--config",
-        default=str(current_file.parent / "dubbing.conf"),
-        help="配置文件路径（默认：ai_dubbing/dubbing.conf）",
+    parser = argparse.ArgumentParser(
+        description="基于命令行参数的 SRT/TXT 配音工具",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--input-file",
+        required=True,
+        help="输入文件路径（SRT 或 TXT）",
+    )
+    parser.add_argument(
+        "--voice-files",
+        nargs="+",
+        default=[DEFAULT_VOICE_FILE],
+        help="一个或多个参考音频路径，多个值用空格分隔",
+    )
+    parser.add_argument(
+        "--prompt-texts",
+        nargs="+",
+        default=[DEFAULT_PROMPT_TEXT],
+        help="与参考音频一一对应的文本，包含空格时请用引号包裹",
+    )
+    parser.add_argument(
+        "--output-file",
+        required=True,
+        help="输出音频文件路径",
+    )
+    parser.add_argument(
+        "--tts-engine",
+        default=DEFAULT_TTS_ENGINE,
+        choices=sorted(TTS_ENGINES.keys()),
+        help="TTS 引擎",
+    )
+    parser.add_argument(
+        "--strategy",
+        choices=list_available_strategies(),
+        help="时间同步策略；未传时自动按输入类型选择（SRT=stretch，TXT=basic）",
+    )
+    parser.add_argument(
+        "--emotion-text",
+        default=DEFAULT_EMOTION_TEXT,
+        help="IndexTTS2 文本情感描述",
+    )
+    parser.add_argument(
+        "--emotion-alpha",
+        type=float,
+        default=DEFAULT_EMOTION_ALPHA,
+        help="情感强度，范围 0.0-1.0",
+    )
 
-def load_config(config_file):
-    """加载配置文件，返回配置字典"""
-    if not os.path.exists(config_file):
-        # 创建简单logger用于配置文件不存在的错误
-        setup_logging("INFO")
-        logger = get_logger()
-        logger.error(f"配置文件 {config_file} 不存在")
-        logger.info("请复制 dubbing.conf.example 为 dubbing.conf 并根据实际需求修改参数")
-        sys.exit(1)
-    
-    config = configparser.ConfigParser()
-    config.read(config_file, encoding='utf-8')
-    return config
+    args = parser.parse_args()
+    validate_args(parser, args)
+    return args
 
-def get_config_value(config, section, key, default=None, value_type=str):
-    """获取配置值，支持类型转换"""
-    try:
-        if value_type == bool:
-            return config.getboolean(section, key)
-        elif value_type == float:
-            return config.getfloat(section, key)
-        elif value_type == int:
-            return config.getint(section, key)
-        else:
-            return config.get(section, key)
-    except (configparser.NoSectionError, configparser.NoOptionError):
-        return default
+def validate_args(parser, args):
+    """校验命令行参数"""
+    if len(args.voice_files) != len(args.prompt_texts):
+        parser.error(
+            f"--voice-files ({len(args.voice_files)}) 和 --prompt-texts ({len(args.prompt_texts)}) 的数量必须一致"
+        )
 
-def parse_quoted_list(text):
-    """
-    解析带引号的逗号分隔列表
-    例如: '"文本1", "文本2", "文本3"' -> ['文本1', '文本2', '文本3']
-    也支持不带引号的简单列表: 'file1.wav, file2.wav' -> ['file1.wav', 'file2.wav']
-    """
-    if not text or not text.strip():
-        return []
-    
-    import re
-    # 匹配带引号的字符串或不带引号的简单字符串
-    pattern = r'"([^"]*?)"|([^,]+)'
-    matches = re.findall(pattern, text)
-    
-    result = []
-    for quoted, unquoted in matches:
-        if quoted:  # 带引号的字符串
-            result.append(quoted)
-        elif unquoted.strip():  # 不带引号的字符串，去掉前后空白
-            result.append(unquoted.strip())
-    
-    return result
+    if not (0.0 <= args.emotion_alpha <= 1.0):
+        parser.error("--emotion-alpha 必须在 0.0 到 1.0 之间")
 
-def get_multi_voice_config(config):
-    """
-    获取多对参考音频配置
-    
-    Returns:
-        tuple: (voice_files_list, prompt_texts_list)
-    """
-    voice_files_str = get_config_value(config, '基本配置', 'voice_files', None)
-    prompt_texts_str = get_config_value(config, '基本配置', 'prompt_texts', None)
-    
-    if not voice_files_str or not prompt_texts_str:
-        raise ValueError("必须同时配置 voice_files 和 prompt_texts")
-    
-    # 解析配置
-    voice_files = parse_quoted_list(voice_files_str)
-    prompt_texts = parse_quoted_list(prompt_texts_str)
-    
-    if not voice_files or not prompt_texts:
-        raise ValueError("voice_files 和 prompt_texts 不能为空")
-    
-    if len(voice_files) != len(prompt_texts):
-        raise ValueError(f"voice_files ({len(voice_files)}) 和 prompt_texts ({len(prompt_texts)}) 的数量不匹配")
-    
-    return voice_files, prompt_texts
+def determine_strategy(input_file, explicit_strategy):
+    """根据输入文件类型决定默认策略。"""
+    if explicit_strategy:
+        return explicit_strategy
+    return "basic" if Path(input_file).suffix.lower() == ".txt" else "stretch"
 
-def get_emotion_config(config):
-    """
-    获取IndexTTS2情感控制配置
-    
-    Args:
-        config: configparser.ConfigParser对象
-    
-    Returns:
-        dict: 情感控制参数字典
-    """
-    SECTION_NAME = 'IndexTTS2情感控制'
-    
-    # 情感模式处理器映射
-    mode_handlers = {
-        'audio': _handle_audio_emotion,
-        'vector': _handle_vector_emotion,
-        'text': _handle_text_emotion,
-        'auto': _handle_auto_emotion,
-    }
-    
-    emotion_config = {}
-    emotion_mode = get_config_value(config, SECTION_NAME, 'emotion_mode', 'auto')
-    
-    # 处理特定情感模式
-    handler = mode_handlers.get(emotion_mode)
-    if handler:
-        emotion_config.update(handler(config, SECTION_NAME))
-    
-    # 添加通用参数
-    emotion_config.update(_get_common_emotion_params(config, SECTION_NAME))
-    
-    return emotion_config
-
-def _handle_audio_emotion(config, section_name):
-    """处理音频引导模式"""
-    emotion_audio_file = get_config_value(config, section_name, 'emotion_audio_file')
-    return {'emotion_audio_file': emotion_audio_file.strip()} if emotion_audio_file and emotion_audio_file.strip() else {}
-
-def _handle_vector_emotion(config, section_name):
-    """处理情感向量模式"""
-    emotion_vector_str = get_config_value(config, section_name, 'emotion_vector')
-    if not emotion_vector_str or not emotion_vector_str.strip():
-        return {}
-    
-    try:
-        emotion_vector = [float(x.strip()) for x in emotion_vector_str.split(',')]
-        if len(emotion_vector) == 8:
-            return {'emotion_vector': emotion_vector}
-        else:
-            print(f"警告：情感向量必须包含8个数值，当前有{len(emotion_vector)}个")
-    except ValueError as e:
-        print(f"警告：情感向量格式错误: {e}")
-    
-    return {}
-
-def _handle_text_emotion(config, section_name):
-    """处理文本描述模式"""
-    emotion_text = get_config_value(config, section_name, 'emotion_text')
-    return {'emotion_text': emotion_text.strip()} if emotion_text and emotion_text.strip() else {}
-
-def _handle_auto_emotion(config, section_name):
-    """处理自动检测模式"""
-    return {'auto_emotion': True}
-
-def _get_common_emotion_params(config, section_name):
-    """获取通用情感参数"""
-    emotion_alpha = get_config_value(config, section_name, 'emotion_alpha', 0.8, float)
-    
-    # 验证情感强度范围
-    if not (0.0 <= emotion_alpha <= 1.0):
-        print(f"警告：情感强度超出范围[0.0, 1.0]，使用默认值0.8，当前值: {emotion_alpha}")
-        emotion_alpha = 0.8
-    
+def get_emotion_config(args):
+    """从命令行参数构建 IndexTTS2 文本情感配置"""
     return {
-        'emotion_alpha': emotion_alpha,
-        'use_random': get_config_value(config, section_name, 'use_random', False, bool)
+        "emotion_text": args.emotion_text.strip(),
+        "emotion_alpha": args.emotion_alpha,
     }
 
 def main():
     """主函数：完全遵循cli.py的精确结构和逻辑"""
     args = parse_args()
     configure_external_loggers()
-
-    # 加载配置
-    config = load_config(args.config)
     
-    # 解析配置参数（映射到cli.py的参数）
-    input_file = get_config_value(config, '基本配置', 'input_file')
-    output_file = get_config_value(config, '基本配置', 'output_file', PATH.get_default_output_path())
-    tts_engine_name = get_config_value(config, '基本配置', 'tts_engine', 'fish_speech')
-    strategy_name = get_config_value(config, '基本配置', 'strategy', 'stretch')
-    lang = get_config_value(config, '高级配置', 'language', 'zh')
-    # 并发配置（供策略并行合成使用）
-    tts_max_concurrency = get_config_value(config, '并发配置', 'tts_max_concurrency', 8, int)
-    tts_max_retries = get_config_value(config, '并发配置', 'tts_max_retries', 2, int)
-    
-    # 解析多对参考音频配置
-    voice_files, prompt_texts = get_multi_voice_config(config)
+    input_file = args.input_file
+    output_file = args.output_file
+    tts_engine_name = args.tts_engine
+    strategy_name = determine_strategy(input_file, args.strategy)
+    lang = DEFAULT_LANGUAGE
+    tts_max_retries = DEFAULT_TTS_MAX_RETRIES
+    voice_files = args.voice_files
+    prompt_texts = args.prompt_texts
     
     # --- 初始化 ---
     start_time = time.time()
@@ -247,7 +162,7 @@ def main():
     # 获取情感控制配置（仅当使用IndexTTS2时）
     emotion_config = {}
     if tts_engine_name == 'index_tts2':
-        emotion_config = get_emotion_config(config)
+        emotion_config = get_emotion_config(args)
         if emotion_config:
             logger.info(f"IndexTTS2情感控制配置: {emotion_config}")
     
@@ -257,7 +172,7 @@ def main():
         logger.info(f"  {i}. 音频: {voice_file}")
         logger.info(f"     文本: {prompt_text}")
     
-    process_logger = create_process_logger("配置文件配音任务")
+    process_logger = create_process_logger("命令行配音任务")
     
     # --- 确定输入文件类型和解析器 ---
     file_extension = os.path.splitext(input_file)[1].lower()
@@ -326,8 +241,6 @@ def main():
             "ref_text": prompt_texts[0] if prompt_texts else None,     # 兼容性
             "voice_files": voice_files,        # 所有参考音频文件
             "prompt_texts": prompt_texts,      # 所有参考文本
-            # 并发相关参数：由基础策略读取并控制
-            "max_concurrency": tts_max_concurrency,
             "max_retries": tts_max_retries,
             # IndexTTS2情感控制参数
             **emotion_config
@@ -366,5 +279,4 @@ def main():
     return 0
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())
