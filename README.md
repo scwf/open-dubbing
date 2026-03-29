@@ -86,11 +86,17 @@ open-dubbing/
 项目为每个 TTS 引擎提供了独立的安装脚本，您可以根据需要选择安装：
 
 #### IndexTTS2 引擎（推荐）
+
+默认使用模型：`IndexTTS-2`
+
 ```bash
 ./install-index-tts2.sh
 ```
 
 #### Fish Speech 引擎
+
+默认使用模型：`openaudio-s1-mini`
+
 ```bash
 ./install.sh
 # 或者使用具体的脚本名
@@ -98,11 +104,17 @@ open-dubbing/
 ```
 
 #### F5-TTS 引擎
+
+默认使用模型：`F5TTS_v1_Base`
+
 ```bash
 ./install-f5-tts.sh
 ```
 
 #### CosyVoice 引擎
+
+默认使用模型：`Fun-CosyVoice3-0.5B`
+
 ```bash
 ./install-cosyvoice.sh
 ```
