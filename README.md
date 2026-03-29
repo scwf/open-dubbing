@@ -77,7 +77,7 @@ open-dubbing/
 推荐使用带 submodule 的方式克隆：
 
 ```bash
-git clone --recursive <your-repo-url>
+git clone --recursive git@github.com:scwf/open-dubbing.git
 cd open-dubbing
 ```
 
