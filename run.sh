@@ -2,18 +2,16 @@
 set -e
 
 # --- Configuration ---
-PROJECT_DIR=$(pwd)
-DEPS_DIR="deps"
-MODEL_CACHE_DIR="models"
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Available TTS engines
 declare -A TTS_ENGINES=(
     ["fish-speech"]="install-fish-speech.sh"
     ["cosyvoice"]="install-cosyvoice.sh"
     ["f5-tts"]="install-f5-tts.sh"
-    ["index-tts"]="install-index-tts.sh"
     ["index-tts2"]="install-index-tts2.sh"
 )
+ENGINE_ORDER=("fish-speech" "cosyvoice" "f5-tts" "index-tts2")
 
 # Default engine
 DEFAULT_ENGINE="index-tts2"
@@ -28,10 +26,13 @@ print_info() {
 }
 
 print_usage() {
+    local script_name
+    script_name="$(basename "$0")"
+
     echo "Usage: $0 [ENGINE] [OPTIONS]"
     echo ""
     echo "Available TTS engines:"
-    for engine in "${!TTS_ENGINES[@]}"; do
+    for engine in "${ENGINE_ORDER[@]}"; do
         if [ "$engine" = "$DEFAULT_ENGINE" ]; then
             echo "  $engine (default)"
         else
@@ -47,12 +48,12 @@ print_usage() {
     echo "  --help, -h        Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                                # Install and run with default engine (index-tts2)"
-    echo "  $0 cosyvoice                      # Install and run with CosyVoice"
-    echo "  $0 f5-tts --install-only          # Only install F5-TTS"
-    echo "  $0 cosyvoice --force-install      # Force reinstall CosyVoice"
-    echo "  $0 --server-only                  # Only start server with current environment"
-    echo "  $0 --status                       # Show installation status of all engines"
+    echo "  $script_name                                # Install and run with default engine (index-tts2)"
+    echo "  $script_name cosyvoice                      # Install and run with CosyVoice"
+    echo "  $script_name f5-tts --install-only          # Only install F5-TTS"
+    echo "  $script_name cosyvoice --force-install      # Force reinstall CosyVoice"
+    echo "  $script_name --server-only                  # Only start server with default engine"
+    echo "  $script_name --status                       # Show installation status of all engines"
 }
 
 get_engine_env_name() {
@@ -61,7 +62,6 @@ get_engine_env_name() {
         "fish-speech") echo "fish-speech" ;;
         "cosyvoice") echo "cosyvoice" ;;
         "f5-tts") echo "f5-tts" ;;
-        "index-tts") echo "index-tts" ;;
         "index-tts2") echo "index-tts2" ;;
         *) echo "unknown" ;;
     esac
@@ -74,7 +74,7 @@ install_engine() {
     
     if [ -z "$install_script" ]; then
         echo "Error: Unknown engine '$engine'"
-        echo "Available engines: ${!TTS_ENGINES[*]}"
+        echo "Available engines: ${ENGINE_ORDER[*]}"
         exit 1
     fi
     
@@ -116,7 +116,7 @@ check_engine_status() {
 
 show_status() {
     print_info "TTS Engine Installation Status"
-    for engine in "${!TTS_ENGINES[@]}"; do
+    for engine in "${ENGINE_ORDER[@]}"; do
         check_engine_status "$engine"
     done
 }
@@ -198,6 +198,8 @@ if ! command -v conda &> /dev/null; then
     echo "Error: Conda is not installed or not in your PATH. Please install Conda first."
     exit 1
 fi
+
+cd "$PROJECT_DIR"
 
 # Execute based on options
 if [ "$SHOW_STATUS" = true ]; then
