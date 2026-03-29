@@ -239,6 +239,23 @@ use_random = false
 python ai_dubbing/run_dubbing.py
 ```
 
+#### IndexTTS2 与 WSL 启动注意事项
+
+需要注意的是，社区版 `index-tts` 在加载 `w2v-bert`、`MaskGCT`、`campplus`、`bigvgan` 等辅助依赖时，会使用相对路径 `./checkpoints/hf_cache` 作为缓存目录。因此必须先切换到预期的工作目录，否则这些缓存可能会落到当前目录对应的 `./checkpoints/hf_cache` 下，并触发重复下载。
+
+推荐写法：
+
+```bash
+cd /home/xiaofei/code/open-dubbing
+python ai_dubbing/run_dubbing.py --config /mnt/c/path/to/dubbing.conf
+```
+
+如果从 Windows 侧调用 `wsl.exe`，也建议显式先 `cd`：
+
+```bash
+wsl.exe -e bash -lc "cd /home/xiaofei/code/open-dubbing && conda run -n fish-speech --no-capture-output python /home/xiaofei/code/open-dubbing/ai_dubbing/run_dubbing.py --config /mnt/c/path/to/dubbing.conf"
+```
+
 ### 仅优化字幕（不合成音频）
 
 ```bash

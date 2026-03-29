@@ -77,8 +77,7 @@ class StrategyConfig:
 
 class IndexTTS2Config:
     """IndexTTS2引擎专用配置"""
-    # 支持为 IndexTTS2 单独覆盖模型目录，避免影响其他引擎的全局模型缓存路径
-    MODEL_DIR = str(Path(os.getenv('INDEX_TTS2_MODEL_DIR', str(MODEL_CACHE_DIR / "IndexTTS-2"))))
+    MODEL_DIR = str(MODEL_CACHE_DIR / "IndexTTS-2")
     CONFIG_FILE = str(Path(MODEL_DIR) / "config.yaml")
     SOURCE_DIR = str(Path(os.getenv('INDEX_TTS_DIR', str(PROJECT_ROOT / 'index-tts'))))
     
