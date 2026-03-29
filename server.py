@@ -405,7 +405,7 @@ async def get_dubbing_config():
         "basic": {
             "voice_files": resolve_audio_paths_list(config.get("基本配置", "voice_files", fallback="")),
             "prompt_texts": config.get("基本配置", "prompt_texts", fallback=""),
-            "tts_engine": config.get("基本配置", "tts_engine", fallback="fish_speech"),
+            "tts_engine": config.get("基本配置", "tts_engine", fallback="index_tts2"),
             "strategy": config.get("基本配置", "strategy", fallback="stretch"),
             "language": config.get("高级配置", "language", fallback="zh"),
         },

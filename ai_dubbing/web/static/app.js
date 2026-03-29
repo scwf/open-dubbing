@@ -441,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/dubbing/options');
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = await response.json();
-      populateSelect(engineSelect, data.tts_engines || [], 'TTS 引擎', 'fish_speech');
+      populateSelect(engineSelect, data.tts_engines || [], 'TTS 引擎', 'index_tts2');
       populateSelect(strategySelect, data.strategies || [], '策略', 'stretch');
       populateSelect(languageSelect, data.languages || [], '语言');
     } catch (error) {

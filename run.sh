@@ -16,7 +16,7 @@ declare -A TTS_ENGINES=(
 )
 
 # Default engine
-DEFAULT_ENGINE="fish-speech"
+DEFAULT_ENGINE="index-tts2"
 
 # --- Helper Functions ---
 print_info() {
@@ -47,7 +47,7 @@ print_usage() {
     echo "  --help, -h        Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                                # Install and run with default engine (fish-speech)"
+    echo "  $0                                # Install and run with default engine (index-tts2)"
     echo "  $0 cosyvoice                      # Install and run with CosyVoice"
     echo "  $0 f5-tts --install-only          # Only install F5-TTS"
     echo "  $0 cosyvoice --force-install      # Force reinstall CosyVoice"

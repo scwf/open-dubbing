@@ -72,10 +72,10 @@ open-dubbing/
 ```
 
 **脚本功能：**
-- 🔧 自动创建和激活 `fish-speech` Conda 环境
+- 🔧 自动创建和激活 `index-tts2` Conda 环境
 - 📦 安装所有必需的依赖包（包括 FFmpeg、PyTorch 等）
-- 🔗 克隆和安装 Fish Speech 引擎
-- 📥 下载预训练模型（openaudio-s1-mini）
+- 🔗 克隆和安装 IndexTTS2 引擎
+- 📥 下载预训练模型
 - ⚙️ 自动生成配置文件
 - 🌐 启动 Web UI 服务器
 
@@ -85,16 +85,16 @@ open-dubbing/
 
 项目为每个 TTS 引擎提供了独立的安装脚本，您可以根据需要选择安装：
 
-#### Fish Speech 引擎（推荐）
+#### IndexTTS2 引擎（推荐）
+```bash
+./install-index-tts2.sh
+```
+
+#### Fish Speech 引擎
 ```bash
 ./install.sh
 # 或者使用具体的脚本名
 ./install-fish-speech.sh
-```
-
-#### IndexTTS2 引擎
-```bash
-./install-index-tts2.sh
 ```
 
 #### F5-TTS 引擎
@@ -233,7 +233,7 @@ python ai_dubbing/run_dubbing.py \
 如果从 Windows 侧调用 `wsl.exe`，也建议显式先 `cd`：
 
 ```bash
-wsl.exe -e bash -lc "cd /home/xiaofei/code/open-dubbing && conda run -n fish-speech --no-capture-output python /home/xiaofei/code/open-dubbing/ai_dubbing/run_dubbing.py --input-file /mnt/c/path/to/input.srt --output-file /mnt/c/path/to/output.wav"
+wsl.exe -e bash -lc "cd /home/xiaofei/code/open-dubbing && conda run -n index-tts2 --no-capture-output python /home/xiaofei/code/open-dubbing/ai_dubbing/run_dubbing.py --input-file /mnt/c/path/to/input.srt --output-file /mnt/c/path/to/output.wav"
 ```
 
 ### 仅优化字幕（不合成音频）

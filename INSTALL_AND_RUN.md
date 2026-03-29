@@ -6,11 +6,11 @@
 
 | 引擎名称 | 安装脚本 | Conda 环境名 | 描述 |
 |---------|----------|-------------|-----|
-| fish-speech | install-fish-speech.sh | fish-speech | 默认引擎，高质量语音合成 |
+| fish-speech | install-fish-speech.sh | fish-speech | 高质量语音合成 |
 | cosyvoice | install-cosyvoice.sh | cosyvoice | 阿里开源的语音合成引擎 |
 | f5-tts | install-f5-tts.sh | f5-tts | F5-TTS 语音合成引擎 |
 | index-tts | install-index-tts.sh | index-tts | Index TTS 引擎 |
-| index-tts2 | install-index-tts2.sh | index-tts2 | Index TTS 2.0 引擎 |
+| index-tts2 | install-index-tts2.sh | index-tts2 | 默认引擎，Index TTS 2.0 引擎 |
 
 ## 基本用法
 
@@ -24,7 +24,7 @@
 ./run.sh --status
 ```
 
-### 使用默认引擎 (fish-speech)
+### 使用默认引擎 (index-tts2)
 ```bash
 ./run.sh
 ```
