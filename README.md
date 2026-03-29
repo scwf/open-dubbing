@@ -190,6 +190,23 @@ Web UI 主要分为以下几个功能区域：
 
 #### 1. 直接传入命令行参数
 
+先激活对应的 Python / Conda 环境。默认命令行示例基于 `index-tts2` 环境：
+
+```bash
+conda activate index-tts2
+```
+
+环境和引擎映射如下：
+
+| TTS 引擎参数 | Conda 环境 | 默认模型 |
+| --- | --- | --- |
+| `index_tts2` | `index-tts2` | `IndexTTS-2` |
+| `fish_speech` | `fish-speech` | `openaudio-s1-mini` |
+| `f5_tts` | `f5-tts` | `F5TTS_v1_Base` |
+| `cosy_voice` | `cosyvoice` | `Fun-CosyVoice3-0.5B` |
+
+如果你要切换到其他引擎，请先激活上表对应环境，再执行下面的命令。
+
 ```bash
 python ai_dubbing/run_dubbing.py \
   --input-file "subtitles/movie.srt" \
