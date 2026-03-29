@@ -20,7 +20,7 @@ prompt_texts = "这是第一段参考音频的文本", "这是第二段参考音
 # 输出音频文件路径（默认：output.wav）
 output_file = /path/to/output.wav
 
-# TTS引擎选择：fish_speech, index_tts, index_tts2, f5_tts, cosy_voice
+# TTS引擎选择：fish_speech, index_tts2, f5_tts, cosy_voice
 tts_engine = fish_speech
 
 # 时间同步策略：stretch, basic

@@ -75,25 +75,6 @@ class StrategyConfig:
     ENABLE_SAVE_ENTRY_WAVFILE = False  # 是否保存各个字幕条目的音频文件到临时目录
 
 
-class IndexTTSConfig:
-    """IndexTTS引擎专用配置"""
-    # IndexTTS模型路径 - 从环境变量获取
-    MODEL_DIR = str(MODEL_CACHE_DIR / "index_tts")
-    CONFIG_FILE = str(MODEL_CACHE_DIR / "index_tts" / "config.yaml")
-    SOURCE_DIR = str(Path(os.getenv('INDEX_TTS_DIR', str(PROJECT_ROOT / 'index-tts'))))
-    # TTS推理配置
-    FP16 = True
-    
-    @classmethod
-    def get_init_kwargs(cls) -> Dict[str, Any]:
-        """获取用于IndexTTS初始化的字典"""
-        return {
-            "cfg_path": cls.CONFIG_FILE,
-            "model_dir": cls.MODEL_DIR,
-            "is_fp16": cls.FP16,
-        }
-
-
 class IndexTTS2Config:
     """IndexTTS2引擎专用配置"""
     # 支持为 IndexTTS2 单独覆盖模型目录，避免影响其他引擎的全局模型缓存路径
@@ -266,7 +247,6 @@ class LogConfig:
 CONFIG = {
     'audio': AudioConfig,
     'strategy': StrategyConfig,
-    'model': IndexTTSConfig,
     'index_tts2': IndexTTS2Config,
     'f5_tts': F5TTSConfig,
     'cosy_voice': CosyVoiceConfig,
@@ -282,7 +262,7 @@ def get_config(category: str) -> Any:
     获取指定类别的配置
     
     Args:
-        category: 配置类别 ('audio', 'strategy', 'model', 'path', 'validation', 'log')
+        category: 配置类别 ('audio', 'strategy', 'index_tts2', 'f5_tts', 'cosy_voice', 'fish_speech', 'path', 'validation', 'log')
     
     Returns:
         对应的配置类

@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List, Union
 import logging
 import numpy as np
 
-from ai_dubbing.src.config import CosyVoiceConfig, IndexTTSConfig, FishSpeechConfig, AUDIO
+from ai_dubbing.src.config import CosyVoiceConfig, IndexTTS2Config, FishSpeechConfig, AUDIO
 
 
 def setup_project_path():
@@ -34,9 +34,9 @@ def setup_project_path():
         sys.path.append(CosyVoiceConfig.SOURCE_DIR)
         sys.path.append(CosyVoiceConfig.SOURCE_DIR + "/third_party/Matcha-TTS")
 
-    # 仅当 IndexTTSConfig.SOURCE_DIR 存在时才添加到 sys.path
-    if os.path.exists(IndexTTSConfig.SOURCE_DIR) and IndexTTSConfig.SOURCE_DIR not in sys.path:
-        sys.path.append(IndexTTSConfig.SOURCE_DIR)
+    # 仅当 IndexTTS2Config.SOURCE_DIR 存在时才添加到 sys.path
+    if os.path.exists(IndexTTS2Config.SOURCE_DIR) and IndexTTS2Config.SOURCE_DIR not in sys.path:
+        sys.path.append(IndexTTS2Config.SOURCE_DIR)
 
     # 仅当 FishSpeechConfig.SOURCE_DIR 存在时才添加到 sys.path
     if os.path.exists(FishSpeechConfig.SOURCE_DIR) and FishSpeechConfig.SOURCE_DIR not in sys.path:
