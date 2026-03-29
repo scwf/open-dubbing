@@ -4,7 +4,6 @@ set -e
 # --- Configuration ---
 CONDA_ENV_NAME="cosyvoice"
 PYTHON_VERSION="3.10"
-COSYVOICE_REPO="https://github.com/FunAudioLLM/CosyVoice.git"
 DEPS_DIR="deps"
 COSYVOICE_DIR="${DEPS_DIR}/CosyVoice"
 MODEL_CACHE_DIR="models"
@@ -19,6 +18,11 @@ print_info() {
     echo "=> $1"
     echo "======================================================================="
     echo " "
+}
+
+ensure_submodule() {
+    local submodule_path="$1"
+    git submodule update --init --recursive "${submodule_path}"
 }
 
 # --- Main Script ---
@@ -45,18 +49,10 @@ conda install -c conda-forge ffmpeg -y
 pip install -r requirements.txt
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# 4. Clone and Install CosyVoice
-print_info "Cloning and installing CosyVoice engine..."
+# 4. Initialize and Install CosyVoice
+print_info "Preparing and installing CosyVoice engine..."
 mkdir -p "${DEPS_DIR}"
-if [ -d "${COSYVOICE_DIR}" ]; then
-    echo "CosyVoice directory already exists. Updating via git pull..."
-    cd "${COSYVOICE_DIR}"
-    git pull origin main
-    git submodule update --init --recursive
-    cd "${PROJECT_DIR}"
-else
-    git clone --recursive "${COSYVOICE_REPO}" "${COSYVOICE_DIR}"
-fi
+ensure_submodule "${COSYVOICE_DIR}"
 cd "${COSYVOICE_DIR}"
 pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 cd "${PROJECT_DIR}"

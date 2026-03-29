@@ -4,7 +4,6 @@ set -e
 # --- Configuration ---
 CONDA_ENV_NAME="index-tts2"
 PYTHON_VERSION="3.10"
-INDEX_TTS2_REPO="https://github.com/index-tts/index-tts.git"
 INDEX_TTS2_MODEL="IndexTeam/IndexTTS-2"
 DEPS_DIR="deps"
 INDEX_TTS2_DIR="${DEPS_DIR}/index-tts"
@@ -21,6 +20,11 @@ print_info() {
     echo "=> $1"
     echo "======================================================================="
     echo " "
+}
+
+ensure_submodule() {
+    local submodule_path="$1"
+    git submodule update --init --recursive "${submodule_path}"
 }
 
 # --- Main Script ---
@@ -48,14 +52,10 @@ pip install -r requirements.txt
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install huggingface-hub
 
-# 4. Clone and Install IndexTTS2
-print_info "Cloning and installing IndexTTS2 engine..."
+# 4. Initialize and Install IndexTTS2
+print_info "Preparing and installing IndexTTS2 engine..."
 mkdir -p "${DEPS_DIR}"
-if [ -d "${INDEX_TTS2_DIR}" ]; then
-    echo "IndexTTS2 directory already exists. Skipping clone."
-else
-    git clone "${INDEX_TTS2_REPO}" "${INDEX_TTS2_DIR}"
-fi
+ensure_submodule "${INDEX_TTS2_DIR}"
 cd "${INDEX_TTS2_DIR}"
 pip install -e .
 cd "${PROJECT_DIR}"
