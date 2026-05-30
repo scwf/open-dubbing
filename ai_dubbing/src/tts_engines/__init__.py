@@ -1,6 +1,10 @@
 from __future__ import annotations
 from typing import Dict, Type, Any
 
+from ai_dubbing.src.utils import setup_project_path
+
+setup_project_path()
+
 from .base_engine import BaseTTSEngine
 from .index_tts2_engine import IndexTTS2Engine
 # 当你添加新引擎时，在这里导入

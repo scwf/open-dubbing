@@ -14,12 +14,6 @@ class CosyVoiceEngine(BaseTTSEngine):
     """CosyVoice引擎的实现"""
 
     def __init__(self):
-        """
-        初始化CosyVoice引擎。
-        
-        :param config: 引擎配置
-        """
-        # 动态导入CosyVoice，如果不存在则给出友好提示
         from cosyvoice.cli.cosyvoice import AutoModel
 
         init_kwargs = CosyVoiceConfig.get_init_kwargs()
