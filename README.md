@@ -62,6 +62,10 @@ open-dubbing/
 │       │   ├── f5_tts_engine.py
 │       │   └── cosy_voice_engine.py
 │       └── utils/                # 公共工具（路径、环境初始化等）
+├── skills/
+│   └── subtitle-voice-dubbing/   # Agent Skill（供 AI Agent 调用本仓库配音能力）
+│       ├── SKILL.md
+│       └── reference.md
 └── README.md
 ```
 
@@ -69,6 +73,7 @@ open-dubbing/
 
 - **`deps/`**：三个引擎通过 Git submodule 锁定上游 commit；**F5-TTS 无 submodule**，由 `pip install f5-tts` 提供。
 - **`models/`**：已在 `.gitignore` 中，不纳入版本库；运行对应 `install-*.sh` 后自动下载到该目录。
+- **`skills/`**：面向 AI Agent 的平台无关技能包（见下方 [Agent Skill](#agent-skill)）；`SKILL.md` 定义配音工作流，`reference.md` 提供引擎、参数与故障排查等延伸阅读。
 - **运行方式**：Web UI（`server.py` / `run.sh`）与 CLI（`run_dubbing.py`）共用同一套 `src/` 逻辑。
 
 ## 🚀 快速开始
@@ -238,6 +243,23 @@ Web UI 主要分为以下几个功能区域：
    - 处理过程中，页面会实时显示任务进度。完成后，会提供最终音频文件的下载链接。
 
 ### python脚本方式运行模式(给第三方程序调用或者AI Agent调用)
+
+#### Agent Skill
+
+`skills/subtitle-voice-dubbing/` 是本仓库内置的 **Agent Skill**，供 Cursor、Claude Code 等 AI Agent 按结构化流程调用配音能力（默认走 CLI，而非 Web UI）。
+
+| 文件 | 用途 |
+| --- | --- |
+| `skills/subtitle-voice-dubbing/SKILL.md` | 主技能文档：触发条件、仓库根目录约定、用户交互工作流（获取字幕 → 选参考音 → 选引擎 → 执行 → 交付） |
+| `skills/subtitle-voice-dubbing/reference.md` | 延伸阅读：各平台挂载方式、Conda 环境、CLI 参数、内置参考音、故障排查 |
+
+**使用方式：**
+
+- **随仓库使用**：Clone 后让 Agent 阅读 `skills/subtitle-voice-dubbing/SKILL.md` 即可执行配音；所有 shell 命令须在 **open-dubbing 仓库根目录** 下运行（Skill 内以 `<REPO_ROOT>` 表示）。
+- **复制到平台技能目录**（可选）：可将 `skills/subtitle-voice-dubbing/` 复制或链接到 Cursor 的 `.cursor/skills/`、Claude Code 的技能目录等，便于自动发现；**配音命令仍须在 clone 出的 open-dubbing 根目录执行**，与 Skill 文件物理位置无关。
+- **通用引用**：在 system prompt 或工具说明中加入：`请先阅读 <repo>/skills/subtitle-voice-dubbing/SKILL.md，再执行配音任务`。
+
+Skill 设计遵循仓库内的 [Agent Skill 黄金法则与最佳实践](agent_skill_黄金法则与最佳实践全景指南.md)。详细平台配置见 `skills/subtitle-voice-dubbing/reference.md` 的「在 Agent 平台中使用」一节。
 
 #### 1. 直接传入命令行参数
 
