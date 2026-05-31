@@ -68,11 +68,11 @@ open-dubbing/
 
 本项目依赖以下第三方源码仓库，并且固定到经过验证的 commit，不跟随上游最新版本漂移：
 
-| 路径 | 上游仓库 | 固定 commit |
-| --- | --- | --- |
-| `deps/CosyVoice` | `https://github.com/FunAudioLLM/CosyVoice` | `ace7c47f41bbd303aa6bf1ea80e6f9fbd595cd40` |
-| `deps/fish-speech` | `https://github.com/fishaudio/fish-speech` | `d3df505` (S1-mini 兼容，S2 beta 之前) |
-| `deps/index-tts` | `https://github.com/index-tts/index-tts` | `db5b39bb6ad903c219b2dd33d60b0f0bdaede664` |
+| 路径 | 上游仓库 | 固定 commit | 对应运行模型 |
+| --- | --- | --- | --- |
+| `deps/CosyVoice` | `https://github.com/FunAudioLLM/CosyVoice` | `ace7c47f41bbd303aa6bf1ea80e6f9fbd595cd40` | `Fun-CosyVoice3-0.5B` |
+| `deps/fish-speech` | `https://github.com/fishaudio/fish-speech` | `d3df50503b36314a964f66cac1af1e19e95bcfa3` | `openaudio-s1-mini` |
+| `deps/index-tts` | `https://github.com/index-tts/index-tts` | `db5b39bb6ad903c219b2dd33d60b0f0bdaede664` | `IndexTTS-2` |
 
 推荐使用带 submodule 的方式克隆：
 
@@ -300,7 +300,7 @@ TXT / 纯文本文件 -> basic
 推荐写法：
 
 ```bash
-cd /home/xiaofei/code/open-dubbing
+cd /path/to/open-dubbing
 python ai_dubbing/run_dubbing.py \
   --input-file "/mnt/c/path/to/input.srt" \
   --output-file "/mnt/c/path/to/output.wav"
@@ -309,7 +309,7 @@ python ai_dubbing/run_dubbing.py \
 如果从 Windows 侧调用 `wsl.exe`，也建议显式先 `cd`：
 
 ```bash
-wsl.exe -e bash -lc "cd /home/xiaofei/code/open-dubbing && conda run -n index-tts2 --no-capture-output python /home/xiaofei/code/open-dubbing/ai_dubbing/run_dubbing.py --input-file /mnt/c/path/to/input.srt --output-file /mnt/c/path/to/output.wav"
+wsl.exe -e bash -lc "cd /path/to/open-dubbing && conda run -n index-tts2 --no-capture-output python ai_dubbing/run_dubbing.py --input-file /mnt/c/path/to/input.srt --output-file /mnt/c/path/to/output.wav"
 ```
 
 ### 仅优化字幕（不合成音频）
