@@ -30,12 +30,10 @@ from ai_dubbing.src.logger import setup_logging, create_process_logger, get_logg
 # 初始化项目环境
 setup_project_path()
 
-DEFAULT_VOICE_FILE = str(project_root / "refer_voice" / "mcs.mp3")
+DEFAULT_VOICE_FILE = str(project_root / "resources" / "reference_voices" / "mcs.mp3")
 DEFAULT_PROMPT_TEXT = (
-    "很多人可能觉得，这不简单吗？把我们现有的函数或者API接口直接开放给智能体不就行了？"
-    "但事实证明，这条路往往走不通。为什么呢？因为我们必须明白一个核心前提："
-    "智能体“看见”和“使用”工具的方式，和我们人类开发者是完全不同的。"
-)
+    project_root / "resources" / "reference_voices" / "mcs.txt"
+).read_text(encoding="utf-8").strip()
 DEFAULT_LANGUAGE = "zh"
 DEFAULT_TTS_ENGINE = "index_tts2"
 DEFAULT_TTS_MAX_RETRIES = 2

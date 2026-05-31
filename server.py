@@ -336,6 +336,24 @@ def resolve_audio_path(path_str: str) -> str:
     return str(PROJECT_ROOT / path)
 
 
+def resolve_reference_text(section: str, config) -> str:
+    """Load reference text from config or companion .txt next to the audio file."""
+    text = config.get(section, "text", fallback="").strip()
+    if text:
+        return text
+
+    text_file = config.get(section, "text_file", fallback="").strip()
+    if text_file:
+        return Path(resolve_audio_path(text_file)).read_text(encoding="utf-8").strip()
+
+    audio_path = Path(resolve_audio_path(config.get(section, "path")))
+    txt_path = audio_path.with_suffix(".txt")
+    if txt_path.is_file():
+        return txt_path.read_text(encoding="utf-8").strip()
+
+    return ""
+
+
 def resolve_audio_paths_list(paths_str: str) -> str:
     if not paths_str.strip():
         return ""
@@ -391,10 +409,10 @@ async def get_built_in_audios():
     return {
         section[len(prefix) :]: {
             "path": resolve_audio_path(config.get(section, "path")),
-            "text": config.get(section, "text"),
+            "text": resolve_reference_text(section, config),
         }
         for section in audio_sections
-        if config.has_option(section, "path") and config.has_option(section, "text")
+        if config.has_option(section, "path")
     }
 
 

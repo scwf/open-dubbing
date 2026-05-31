@@ -1,0 +1,1 @@
+嘿Claude，看看这个mock.png，再看看这个Claude.md文件。如果你厌倦了反复确认，如执行npm run test，可设为自动批准

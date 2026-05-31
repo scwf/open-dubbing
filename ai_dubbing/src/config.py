@@ -2,7 +2,7 @@
 配置管理模块
 
 统一管理SRT配音工具的所有配置常量和默认值。
-支持从.env文件加载环境配置。
+支持从可选的 .env 文件加载环境配置；未配置时使用相对项目根的默认路径。
 """
 
 from pathlib import Path
@@ -17,19 +17,24 @@ def load_env_config():
     env_file = Path(__file__).parent.parent / '.env'
     if env_file.exists():
         dotenv.load_dotenv(env_file)
-    else:
-        # 使用默认配置
-        env_file_example = Path(__file__).parent.parent / '.env.example'
-        if env_file_example.exists():
-            print(f"提示: 请复制 {env_file_example} 为 .env 并修改路径配置")
 
 load_env_config()
 
-# 自动获取项目根目录
-PROJECT_ROOT = Path(__file__).parent.parent
+# 项目根目录（open-dubbing/，即 ai_dubbing/ 的上一级）
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# 模型缓存目录 - 仅支持绝对路径，默认统一使用项目下的 models 目录
-MODEL_CACHE_DIR = Path(os.getenv('MODEL_CACHE_DIR', str(PROJECT_ROOT / 'models')))
+
+def resolve_env_path(env_name: str, default: str) -> Path:
+    """Resolve an env path relative to REPO_ROOT; absolute paths are kept as-is."""
+    value = os.getenv(env_name, default).strip()
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return (REPO_ROOT / path).resolve()
+
+
+# 模型缓存目录，默认 <repo>/models
+MODEL_CACHE_DIR = resolve_env_path("MODEL_CACHE_DIR", "models")
 
 
 class AudioConfig:
@@ -79,7 +84,7 @@ class IndexTTS2Config:
     """IndexTTS2引擎专用配置"""
     MODEL_DIR = str(MODEL_CACHE_DIR / "IndexTTS-2")
     CONFIG_FILE = str(Path(MODEL_DIR) / "config.yaml")
-    SOURCE_DIR = str(Path(os.getenv('INDEX_TTS_DIR', str(PROJECT_ROOT / 'index-tts'))))
+    SOURCE_DIR = str(resolve_env_path("INDEX_TTS_DIR", "deps/index-tts"))
     
     # IndexTTS2特有的性能配置
     USE_FP16 = True
@@ -147,7 +152,7 @@ class CosyVoiceConfig:
     LOAD_JIT = False
     LOAD_TRT = False
     LOAD_VLLM = False
-    SOURCE_DIR = str(Path(os.getenv('COSYVOICE_DIR', str(PROJECT_ROOT / 'CosyVoice'))))
+    SOURCE_DIR = str(resolve_env_path("COSYVOICE_DIR", "deps/CosyVoice"))
 
     @classmethod
     def get_init_kwargs(cls) -> Dict[str, Any]:
@@ -166,7 +171,7 @@ class FishSpeechConfig:
     """Fish Speech引擎专用配置"""
     LLAMA_CHECKPOINT_PATH = str(MODEL_CACHE_DIR / 'openaudio-s1-mini')
     DECODER_CHECKPOINT_PATH = str(Path(LLAMA_CHECKPOINT_PATH) / 'codec.pth')
-    SOURCE_DIR = str(Path(os.getenv('FISH_SPEECH_DIR', str(PROJECT_ROOT / 'fish-speech'))))
+    SOURCE_DIR = str(resolve_env_path("FISH_SPEECH_DIR", "deps/fish-speech"))
     DEVICE = None  # 自动检测：cuda或cpu
     PRECISION = None  # 自动检测：bfloat16或float32
     COMPILE = True

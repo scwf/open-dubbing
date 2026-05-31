@@ -91,23 +91,52 @@ use_random = false
 
 # ---------------- 内置参考音频配置 ----------------
 #
-# 您可以在此配置多个内置参考音频，方便在Web UI中直接选择。
+# 您可以在此配置多个内置参考音频，方便在 Web UI 中直接选择。
 # 每个内置音频都是一个独立的配置节（section），格式为 [内置音频:名称]。
-# "名称" 将会显示在UI的下拉菜单中。
+# "名称" 将会显示在 UI 的下拉菜单中。
 #
-# 每个配置节应包含两个键：
-# path: 音频文件的路径
-# text: 该音频对应的参考文本
+# 音频文件与参考文本统一放在 resources/reference_voices/ 下，成对命名：
+#   resources/reference_voices/{name}.wav  +  resources/reference_voices/{name}.txt
+#
+# 每个配置节只需指定 path；省略 text 时，会自动读取同目录下同名 .txt。
+# 也可显式指定 text 或 text_file 覆盖默认行为。
 #
 # 示例:
+[内置音频:mcs]
+path = resources/reference_voices/mcs.mp3
+
+[内置音频:wf1]
+path = resources/reference_voices/wf1.mp3
+
+[内置音频:wf2]
+path = resources/reference_voices/wf2.mp3
+
+[内置音频:wf3]
+path = resources/reference_voices/wf3.mp3
+
+[内置音频:wf4]
+path = resources/reference_voices/wf4.wav
+
+[内置音频:wf5]
+path = resources/reference_voices/wf5.mp3
+
+[内置音频:wf6]
+path = resources/reference_voices/wf6.mp3
+
+[内置音频:wf7]
+path = resources/reference_voices/wf7.mp3
+
 [内置音频:wm1]
-path = resources/wm1.wav
-text = "希望你以后做得比我还好哟"
+path = resources/reference_voices/wm1.wav
 
 [内置音频:qjc]
-path = resources/qjc.wav
-text = "你说遇事不决，可问春风，春风不语，即随本心"
+path = resources/reference_voices/qjc.wav
 
 [内置音频:tyzr]
-path = resources/tyzr.wav
-text = "对，这就是我，万人敬仰的太乙真人"
+path = resources/reference_voices/tyzr.wav
+
+[内置音频:zxx]
+path = resources/reference_voices/zxx.wav
+
+[内置音频:karpathy]
+path = resources/reference_voices/karpathy.wav
