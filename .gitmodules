@@ -7,3 +7,6 @@
 [submodule "deps/index-tts"]
 	path = deps/index-tts
 	url = https://github.com/index-tts/index-tts.git
+[submodule "deps/index-tts-2.5"]
+	path = deps/index-tts-2.5
+	url = https://github.com/index-tts/index-tts.git

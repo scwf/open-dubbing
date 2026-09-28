@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List, Union
 import logging
 import numpy as np
 
-from ai_dubbing.src.config import CosyVoiceConfig, IndexTTS2Config, FishSpeechConfig, AUDIO
+from ai_dubbing.src.config import CosyVoiceConfig, IndexTTS2Config, IndexTTS25Config, FishSpeechConfig, AUDIO
 
 
 def setup_project_path():
@@ -34,9 +34,21 @@ def setup_project_path():
         sys.path.append(CosyVoiceConfig.SOURCE_DIR)
         sys.path.append(CosyVoiceConfig.SOURCE_DIR + "/third_party/Matcha-TTS")
 
-    # 仅当 IndexTTS2Config.SOURCE_DIR 存在时才添加到 sys.path
-    if os.path.exists(IndexTTS2Config.SOURCE_DIR) and IndexTTS2Config.SOURCE_DIR not in sys.path:
-        sys.path.append(IndexTTS2Config.SOURCE_DIR)
+    # IndexTTS-2 与 2.5 都叫 indextts，同一个进程只能加载其中一棵源码树。
+    # index-tts25 环境使用同时包含 infer_v2 / infer_v2_5 的 2.5 源码；
+    # 原 index-tts2 环境继续只加载锁定的旧源码，避免改到正在使用的 2 版本。
+    prefer_index_tts25 = (
+        os.environ.get("INDEX_TTS_VARIANT", "").strip() == "2.5"
+        or os.environ.get("CONDA_DEFAULT_ENV", "") == IndexTTS25Config.CONDA_ENV_NAME
+    )
+    if prefer_index_tts25 and os.path.isdir(IndexTTS25Config.SOURCE_DIR):
+        index_tts_source = IndexTTS25Config.SOURCE_DIR
+    elif os.path.isdir(IndexTTS2Config.SOURCE_DIR):
+        index_tts_source = IndexTTS2Config.SOURCE_DIR
+    else:
+        index_tts_source = ""
+    if index_tts_source and index_tts_source not in sys.path:
+        sys.path.append(index_tts_source)
 
     # 仅当 FishSpeechConfig.SOURCE_DIR 存在时才添加到 sys.path
     if os.path.exists(FishSpeechConfig.SOURCE_DIR) and FishSpeechConfig.SOURCE_DIR not in sys.path:

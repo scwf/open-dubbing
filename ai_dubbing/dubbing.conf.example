@@ -20,8 +20,8 @@ prompt_texts = "这是第一段参考音频的文本", "这是第二段参考音
 # 输出音频文件路径（默认：output.wav）
 output_file = /path/to/output.wav
 
-# TTS引擎选择：fish_speech, index_tts2, f5_tts, cosy_voice
-tts_engine = fish_speech
+# TTS引擎选择：index_tts25, index_tts2, fish_speech, f5_tts, cosy_voice
+tts_engine = index_tts25
 
 # 时间同步策略：stretch, basic
 # 注意：TXT文件模式下系统会自动使用basic策略
@@ -64,7 +64,7 @@ borrow_ratio = 1
 extra_buffer = 200
 
 [IndexTTS2情感控制]
-# IndexTTS2专用情感控制配置 (仅当tts_engine=index_tts2时生效)
+# IndexTTS 情感控制配置 (tts_engine 为 index_tts25 或 index_tts2 时生效)
 # 情感控制模式：auto(自动检测), audio(音频引导), vector(向量控制), text(文本描述)
 emotion_mode = auto
 

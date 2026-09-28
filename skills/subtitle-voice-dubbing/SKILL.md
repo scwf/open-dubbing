@@ -43,7 +43,7 @@ pwd                # 可选：确认当前目录为仓库根
 WSL / 远程调用时同样必须先 `cd`：
 
 ```bash
-wsl.exe -e bash -lc 'cd "<REPO_ROOT>" && conda activate index-tts2 && python ai_dubbing/run_dubbing.py ...'
+wsl.exe -e bash -lc 'cd "<REPO_ROOT>" && conda activate index-tts25 && python ai_dubbing/run_dubbing.py ...'
 ```
 
 ## 工作流
@@ -53,7 +53,7 @@ wsl.exe -e bash -lc 'cd "<REPO_ROOT>" && conda activate index-tts2 && python ai_
 ```
 - [ ] 1. 获取配音内容：用户提供 SRT/TXT 路径（或协助准备字幕文件）
 - [ ] 2. 选择参考音：默认展示内置参考音列表供用户点选，末项为「自定义参考音」
-- [ ] 3. 选择克隆引擎：展示可用 TTS 引擎供用户点选（默认 index_tts2）
+- [ ] 3. 选择克隆引擎：展示可用 TTS 引擎供用户点选（默认 index_tts25）
 - [ ] 4. 执行配音：先 `cd <REPO_ROOT>`，激活 Conda 环境，再运行 run_dubbing.py
 - [ ] 5. 交付结果：确认 WAV 生成成功，将输出路径交给用户
 ```
@@ -89,18 +89,19 @@ wsl.exe -e bash -lc 'cd "<REPO_ROOT>" && conda activate index-tts2 && python ai_
 
 ### 3. 选择克隆引擎
 
-向用户展示可用 **TTS 克隆引擎**，请其选择一项（用户未指定时默认 **IndexTTS2**）：
+向用户展示可用 **TTS 克隆引擎**，请其选择一项（用户未指定时默认 **IndexTTS-2.5**）：
 
 | # | 显示名 | `--tts-engine` | Conda 环境 | 特点 |
 | --- | --- | --- | --- | --- |
-| 1 | IndexTTS2（默认） | `index_tts2` | `index-tts2` | 推荐；支持情感控制 |
-| 2 | Fish Speech | `fish_speech` | `fish-speech` | openaudio-s1-mini |
-| 3 | F5-TTS | `f5_tts` | `f5-tts` | 轻量基线 |
-| 4 | CosyVoice | `cosy_voice` | `cosyvoice` | Fun-CosyVoice3 |
+| 1 | IndexTTS-2.5（默认） | `index_tts25` | `index-tts25` | 新版；须用该环境启动 |
+| 2 | IndexTTS2 | `index_tts2` | `index-tts2` | 原版，保留对照 |
+| 3 | Fish Speech | `fish_speech` | `fish-speech` | openaudio-s1-mini |
+| 4 | F5-TTS | `f5_tts` | `f5-tts` | 轻量基线 |
+| 5 | CosyVoice | `cosy_voice` | `cosyvoice` | Fun-CosyVoice3 |
 
 用户选定后：记录 `--tts-engine` 值及需 `conda activate` 的环境名。环境或模型未安装时，引导运行对应 `install-*.sh`（见 [reference.md](reference.md#引擎与环境)）。
 
-选 **IndexTTS2** 时，可额外询问 `--emotion-text`（默认「平静」）与 `--emotion-alpha`（默认 `0.5`）。
+选 **IndexTTS2** 或 **IndexTTS-2.5** 时，可额外询问 `--emotion-text`（默认「平静」）与 `--emotion-alpha`（默认 `0.5`）。2.5 还可传 `--language`（zh/en/ja/es/ar）。
 
 ### 4. 执行配音
 

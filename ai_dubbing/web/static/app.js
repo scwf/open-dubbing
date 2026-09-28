@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Append IndexTTS2 emotion control parameters (only if IndexTTS2 is selected)
     const selectedEngine = document.getElementById('tts_engine').value;
-    if (selectedEngine === 'index_tts2') {
+    if (selectedEngine === 'index_tts2' || selectedEngine === 'index_tts25') {
       // Emotion mode
       const emotionMode = document.getElementById('emotion_mode');
       if (emotionMode) {
@@ -441,7 +441,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/dubbing/options');
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = await response.json();
-      populateSelect(engineSelect, data.tts_engines || [], 'TTS 引擎', 'index_tts2');
+      populateSelect(engineSelect, data.tts_engines || [], 'TTS 引擎', 'index_tts25', {
+        index_tts2: 'IndexTTS-2',
+        index_tts25: 'IndexTTS-2.5',
+        fish_speech: 'Fish Speech',
+        f5_tts: 'F5-TTS',
+        cosy_voice: 'CosyVoice',
+      });
       populateSelect(strategySelect, data.strategies || [], '策略', 'stretch');
       populateSelect(languageSelect, data.languages || [], '语言');
     } catch (error) {
@@ -455,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function showLoadingState() { [engineSelect, strategySelect, languageSelect].forEach(s => { s.innerHTML = '<option value="">加载中...</option>'; s.disabled = true; }); }
   function hideLoadingState() { [engineSelect, strategySelect, languageSelect].forEach(s => { s.disabled = false; }); }
 
-  function populateSelect(select, options, placeholder, defaultValue = null) {
+  function populateSelect(select, options, placeholder, defaultValue = null, labels = null) {
     select.innerHTML = '';
     const placeholderOpt = document.createElement('option');
     placeholderOpt.value = '';
@@ -465,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
     options.forEach(option => {
       const opt = document.createElement('option');
       opt.value = option;
-      opt.textContent = option;
+      opt.textContent = (labels && labels[option]) || option;
       if (option === defaultValue) opt.selected = true;
       select.appendChild(opt);
     });
@@ -616,7 +622,7 @@ async function loadConfig() {
 
     // Add IndexTTS2 emotion control parameters if IndexTTS2 is selected
     const selectedEngine = document.getElementById('tts_engine')?.value;
-    if (selectedEngine === 'index_tts2') {
+    if (selectedEngine === 'index_tts2' || selectedEngine === 'index_tts25') {
       config.index_tts2_emotion = {
         emotion_mode: document.getElementById('emotion_mode')?.value || 'auto',
         emotion_vector: document.getElementById('emotion_vector')?.value || '',
@@ -1139,7 +1145,7 @@ function toggleEmotionControls(engineValue) {
   const emotionTab = document.getElementById('tab-emotion-btn');
   const emotionTabContent = document.getElementById('tab-emotion');
   
-  if (engineValue === 'index_tts2') {
+  if (engineValue === 'index_tts2' || engineValue === 'index_tts25') {
     // 显示IndexTTS2情感控制标签页
     if (emotionTab) {
       emotionTab.style.setProperty('display', 'inline-block', 'important');

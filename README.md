@@ -21,8 +21,9 @@ AI配音工具是一个专业的AI语音克隆配音解决方案，通过先进�
 
 ```text
 open-dubbing/
-├── run.sh                        # 一键部署启动（默认 index-tts2，安装 + 启动 Web UI）
+├── run.sh                        # 一键部署启动（默认 index-tts25，安装 + 启动 Web UI）
 ├── install-index-tts2.sh         # IndexTTS2 环境安装脚本
+├── install-index-tts25.sh        # IndexTTS-2.5 环境安装脚本（保留 IndexTTS-2）
 ├── install-fish-speech.sh        # Fish Speech 环境安装脚本
 ├── install-f5-tts.sh             # F5-TTS 环境安装脚本
 ├── install-cosyvoice.sh          # CosyVoice 环境安装脚本
@@ -34,7 +35,8 @@ open-dubbing/
 ├── requirements.txt              # 主项目 Python 依赖
 ├── .gitmodules                   # Git submodule 配置
 ├── deps/                         # 第三方引擎源码（Git submodule，固定 commit）
-│   ├── index-tts/                # IndexTTS2 上游源码
+│   ├── index-tts/                # IndexTTS2 上游源码（保持原 pin）
+│   ├── index-tts-2.5/            # IndexTTS-2.5 上游源码
 │   ├── fish-speech/              # Fish Speech 上游源码
 │   └── CosyVoice/                # CosyVoice 上游源码
 ├── models/                       # 模型权重缓存（.gitignore，由 install-*.sh 下载）
@@ -58,6 +60,7 @@ open-dubbing/
 │       ├── optimizer/            # 字幕文本优化（LLM）
 │       ├── tts_engines/          # TTS 引擎适配层
 │       │   ├── index_tts2_engine.py
+│       │   ├── index_tts25_engine.py
 │       │   ├── fish_speech_engine.py
 │       │   ├── f5_tts_engine.py
 │       │   └── cosy_voice_engine.py
@@ -87,6 +90,7 @@ open-dubbing/
 | `deps/CosyVoice` | `https://github.com/FunAudioLLM/CosyVoice` | `ace7c47f41bbd303aa6bf1ea80e6f9fbd595cd40` | `Fun-CosyVoice3-0.5B` |
 | `deps/fish-speech` | `https://github.com/fishaudio/fish-speech` | `d3df50503b36314a964f66cac1af1e19e95bcfa3` | `openaudio-s1-mini` |
 | `deps/index-tts` | `https://github.com/index-tts/index-tts` | `db5b39bb6ad903c219b2dd33d60b0f0bdaede664` | `IndexTTS-2` |
+| `deps/index-tts-2.5` | `https://github.com/index-tts/index-tts` | `ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c` | `IndexTTS-2.5` |
 
 推荐使用带 submodule 的方式克隆：
 
@@ -133,9 +137,9 @@ git submodule update --init --recursive
 
 **脚本功能：**
 
-- 🔧 自动创建和激活 `index-tts2` Conda 环境
+- 🔧 自动创建和激活 `index-tts25` Conda 环境
 - 📦 安装所有必需的依赖包（包括 FFmpeg、PyTorch 等）
-- 🔗 初始化并安装已锁定版本的 IndexTTS2 引擎
+- 🔗 初始化并安装已锁定版本的 IndexTTS-2.5 引擎
 - 📥 下载预训练模型
 - ⚙️ 自动生成配置文件
 - 🌐 启动 Web UI 服务器
@@ -146,9 +150,17 @@ git submodule update --init --recursive
 
 项目为每个 TTS 引擎提供了独立的安装脚本，您可以根据需要选择安装：
 
-#### IndexTTS2 引擎（推荐）
+#### IndexTTS-2.5 引擎（默认）
 
-默认使用模型：`IndexTTS-2`
+默认使用模型：`IndexTTS-2.5`
+
+```bash
+./install-index-tts25.sh
+```
+
+#### IndexTTS2 引擎（保留）
+
+与 IndexTTS-2.5 并列，环境和权重都不替换。模型：`IndexTTS-2`
 
 ```bash
 ./install-index-tts2.sh
@@ -189,6 +201,9 @@ conda activate fish-speech
 # IndexTTS2 引擎  
 conda activate index-tts2
 
+# IndexTTS-2.5 引擎
+conda activate index-tts25
+
 # F5-TTS 引擎
 conda activate f5-tts
 
@@ -196,7 +211,7 @@ conda activate f5-tts
 conda activate cosyvoice
 ```
 
-> **注意**：在 Web UI 中记得将 TTS 引擎设置为对应的引擎类型（`fish_speech`、`index_tts2`、`f5_tts`、`cosy_voice`）。
+> **注意**：在 Web UI 中记得将 TTS 引擎设置为对应的引擎类型（`fish_speech`、`index_tts2`、`index_tts25`、`f5_tts`、`cosy_voice`）。IndexTTS-2.5 必须在 `index-tts25` 环境中启动。
 
 ## 📝 使用说明
 
@@ -232,7 +247,7 @@ Web UI 主要分为以下几个功能区域：
 
 3. **高级配置**：
    - 提供对 **并发数**、**字幕优化**、**时间借用** 等高级参数的精细调整。
-   - **IndexTTS2 情感控制**：当选择 `index_tts2` 引擎时，会显示专门的情感控制面板，支持以下能力：
+   - **IndexTTS 情感控制**：当选择 `index_tts2` 或 `index_tts25` 引擎时，会显示专门的情感控制面板，支持以下能力：
      - **情感模式**：自动分析、音频提示、情感向量、文本描述四种模式。
      - **情感强度**：可调节情感表达的强烈程度（`0.0-1.0`）。
      - **随机采样**：增加语音的自然变化。
@@ -263,16 +278,17 @@ Skill 设计遵循仓库内的 [Agent Skill 黄金法则与最佳实践](agent_s
 
 #### 1. 直接传入命令行参数
 
-先激活对应的 Python / Conda 环境。默认命令行示例基于 `index-tts2` 环境：
+先激活对应的 Python / Conda 环境。默认命令行示例基于 `index-tts25` 环境：
 
 ```bash
-conda activate index-tts2
+conda activate index-tts25
 ```
 
 环境和引擎映射如下：
 
 | TTS 引擎参数 | Conda 环境 | 默认模型 |
 | --- | --- | --- |
+| `index_tts25` | `index-tts25` | `IndexTTS-2.5` |
 | `index_tts2` | `index-tts2` | `IndexTTS-2` |
 | `fish_speech` | `fish-speech` | `openaudio-s1-mini` |
 | `f5_tts` | `f5-tts` | `F5TTS_v1_Base` |
@@ -293,7 +309,7 @@ python ai_dubbing/run_dubbing.py \
 --output-file            输出音频文件路径（必填）
 --voice-files            参考音频列表；默认 resources/reference_voices/mcs.mp3
 --prompt-texts           参考文本列表；默认读取 resources/reference_voices/mcs.txt
---tts-engine             可选：index_tts2, fish_speech, f5_tts, cosy_voice；默认 index_tts2
+--tts-engine             可选：index_tts25, index_tts2, fish_speech, f5_tts, cosy_voice；默认 index_tts25
 --strategy               可选：stretch, basic；未传时自动选择（SRT=stretch，TXT=basic）
 --emotion-text           IndexTTS2 文本情感描述，默认“平静”
 --emotion-alpha          IndexTTS2 情感强度，默认 0.5
@@ -307,7 +323,7 @@ python ai_dubbing/run_dubbing.py \
   --output-file "output/movie_dubbed.wav" \
   --voice-files "voices/ref1.wav" "voices/ref2.mp3" \
   --prompt-texts "这是第一段参考音频文本" "这是第二段参考音频文本" \
-  --tts-engine index_tts2 \
+  --tts-engine index_tts25 \
   --emotion-text "平静、克制" \
   --emotion-alpha 0.5
 ```
@@ -335,7 +351,7 @@ python ai_dubbing/run_dubbing.py \
 如果从 Windows 侧调用 `wsl.exe`，也建议显式先 `cd`：
 
 ```bash
-wsl.exe -e bash -lc "cd /path/to/open-dubbing && conda run -n index-tts2 --no-capture-output python ai_dubbing/run_dubbing.py --input-file /mnt/c/path/to/input.srt --output-file /mnt/c/path/to/output.wav"
+wsl.exe -e bash -lc "cd /path/to/open-dubbing && conda run -n index-tts25 --no-capture-output python ai_dubbing/run_dubbing.py --input-file /mnt/c/path/to/input.srt --output-file /mnt/c/path/to/output.wav"
 ```
 
 ### 其他附属功能：仅优化字幕（不合成音频）

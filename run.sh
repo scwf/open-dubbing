@@ -10,11 +10,12 @@ declare -A TTS_ENGINES=(
     ["cosyvoice"]="install-cosyvoice.sh"
     ["f5-tts"]="install-f5-tts.sh"
     ["index-tts2"]="install-index-tts2.sh"
+    ["index-tts25"]="install-index-tts25.sh"
 )
-ENGINE_ORDER=("fish-speech" "cosyvoice" "f5-tts" "index-tts2")
+ENGINE_ORDER=("fish-speech" "cosyvoice" "f5-tts" "index-tts2" "index-tts25")
 
 # Default engine
-DEFAULT_ENGINE="index-tts2"
+DEFAULT_ENGINE="index-tts25"
 
 # --- Helper Functions ---
 print_info() {
@@ -48,7 +49,7 @@ print_usage() {
     echo "  --help, -h        Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $script_name                                # Install and run with default engine (index-tts2)"
+    echo "  $script_name                                # Install and run with default engine (index-tts25)"
     echo "  $script_name cosyvoice                      # Install and run with CosyVoice"
     echo "  $script_name f5-tts --install-only          # Only install F5-TTS"
     echo "  $script_name cosyvoice --force-install      # Force reinstall CosyVoice"
@@ -63,6 +64,7 @@ get_engine_env_name() {
         "cosyvoice") echo "cosyvoice" ;;
         "f5-tts") echo "f5-tts" ;;
         "index-tts2") echo "index-tts2" ;;
+        "index-tts25") echo "index-tts25" ;;
         *) echo "unknown" ;;
     esac
 }
@@ -136,6 +138,10 @@ start_server() {
     source "$(conda info --base)/etc/profile.d/conda.sh"
     conda activate "$env_name"
     
+    if [ "$engine" = "index-tts25" ]; then
+        export INDEX_TTS_VARIANT=2.5
+    fi
+
     print_info "Starting the Web UI server with $engine engine..."
     echo " "
     echo "Server is running at http://127.0.0.1:8000"

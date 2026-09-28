@@ -6,6 +6,7 @@
 
 | `--tts-engine` | Conda 环境 | 默认模型 | 安装脚本 |
 | --- | --- | --- | --- |
+| `index_tts25` | `index-tts25` | `IndexTTS-2.5` | `./install-index-tts25.sh` |
 | `index_tts2` | `index-tts2` | `IndexTTS-2` | `./install-index-tts2.sh` |
 | `fish_speech` | `fish-speech` | `openaudio-s1-mini` | `./install-fish-speech.sh` |
 | `f5_tts` | `f5-tts` | `F5TTS_v1_Base` | `./install-f5-tts.sh` |
@@ -20,7 +21,8 @@
 --output-file      输出 WAV（必填）
 --voice-files      参考音频，默认 resources/reference_voices/mcs.mp3
 --prompt-texts     参考文本，默认读 mcs.txt；与 voice-files 数量一致
---tts-engine       index_tts2 | fish_speech | f5_tts | cosy_voice
+--tts-engine       index_tts25（默认） | index_tts2 | fish_speech | f5_tts | cosy_voice
+--language         合成语言，默认 zh。IndexTTS-2.5 支持 zh/en/ja/es/ar
 --strategy         stretch | basic；省略则 SRT→stretch，TXT→basic
 --emotion-text     IndexTTS2 情感描述，默认「平静」
 --emotion-alpha    IndexTTS2 情感强度 0.0–1.0，默认 0.5

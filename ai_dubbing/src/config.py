@@ -117,6 +117,61 @@ class IndexTTS2Config:
         }
 
 
+class IndexTTS25Config:
+    """IndexTTS-2.5 引擎配置。与 IndexTTS-2 分开存放权重和源码。"""
+    MODEL_DIR = str(MODEL_CACHE_DIR / "IndexTTS-2.5")
+    CONFIG_FILE = str(Path(MODEL_DIR) / "config.yaml")
+    SOURCE_DIR = str(resolve_env_path("INDEX_TTS25_DIR", "deps/index-tts-2.5"))
+    CONDA_ENV_NAME = "index-tts25"
+
+    USE_BF16 = True
+    USE_CUDA_KERNEL = False
+    USE_DEEPSPEED = False
+    # 文本情感需要 QwenEmotion；关闭后 use_emo_text 会在推理时直接报错。
+    USE_QWEN_EMO = True
+
+    DEFAULT_EMO_ALPHA = 1.0
+    DEFAULT_USE_RANDOM = False
+    DEFAULT_USE_EMO_TEXT = False
+    DEFAULT_DURATION_FACTOR = 1.0
+    LANG_BY_CODE = {
+        "zh": "ZH",
+        "en": "EN",
+        "ja": "JA",
+        "es": "ES",
+        "ar": "AR",
+    }
+
+    @classmethod
+    def get_init_kwargs(cls) -> Dict[str, Any]:
+        return {
+            "cfg_path": cls.CONFIG_FILE,
+            "model_dir": cls.MODEL_DIR,
+            "use_bf16": cls.USE_BF16,
+            "use_cuda_kernel": cls.USE_CUDA_KERNEL,
+            "use_deepspeed": cls.USE_DEEPSPEED,
+            "use_qwen_emo": cls.USE_QWEN_EMO,
+        }
+
+    @classmethod
+    def get_inference_kwargs(cls) -> Dict[str, Any]:
+        return {
+            "emo_alpha": cls.DEFAULT_EMO_ALPHA,
+            "use_random": cls.DEFAULT_USE_RANDOM,
+            "use_emo_text": cls.DEFAULT_USE_EMO_TEXT,
+            "duration_factor": cls.DEFAULT_DURATION_FACTOR,
+        }
+
+    @classmethod
+    def map_language(cls, language: Optional[str]) -> str:
+        if not language:
+            return "ZH"
+        code = language.strip()
+        if code.upper() in cls.LANG_BY_CODE.values():
+            return code.upper()
+        return cls.LANG_BY_CODE.get(code.lower(), "ZH")
+
+
 class F5TTSConfig:
     """F5TTS引擎相关配置"""
     # 参数源自 F5TTS_infer.md
@@ -252,6 +307,7 @@ CONFIG = {
     'audio': AudioConfig,
     'strategy': StrategyConfig,
     'index_tts2': IndexTTS2Config,
+    'index_tts25': IndexTTS25Config,
     'f5_tts': F5TTSConfig,
     'cosy_voice': CosyVoiceConfig,
     'fish_speech': FishSpeechConfig,

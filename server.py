@@ -299,6 +299,9 @@ async def collect_voice_paths(
     return paths
 
 
+INDEX_TTS_EMOTION_ENGINES = {"index_tts2", "index_tts25"}
+
+
 def build_emotion_config(
     tts_engine: str,
     emotion_mode: str,
@@ -308,7 +311,7 @@ def build_emotion_config(
     emotion_alpha: float,
     use_random: bool,
 ) -> Dict[str, Any]:
-    if tts_engine != "index_tts2":
+    if tts_engine not in INDEX_TTS_EMOTION_ENGINES:
         return {}
 
     config: Dict[str, Any] = {
@@ -423,7 +426,7 @@ async def get_dubbing_config():
         "basic": {
             "voice_files": resolve_audio_paths_list(config.get("基本配置", "voice_files", fallback="")),
             "prompt_texts": config.get("基本配置", "prompt_texts", fallback=""),
-            "tts_engine": config.get("基本配置", "tts_engine", fallback="index_tts2"),
+            "tts_engine": config.get("基本配置", "tts_engine", fallback="index_tts25"),
             "strategy": config.get("基本配置", "strategy", fallback="stretch"),
             "language": config.get("高级配置", "language", fallback="zh"),
         },
@@ -520,7 +523,7 @@ async def create_dubbing(
 
     emotion_audio_path: Optional[Path] = None
     if (
-        tts_engine == "index_tts2"
+        tts_engine in INDEX_TTS_EMOTION_ENGINES
         and emotion_mode == "audio"
         and emotion_audio_file
         and emotion_audio_file.size is not None
@@ -696,6 +699,7 @@ def run_dubbing(
             "max_concurrency": max_concurrency,
             "max_retries": max_retries,
             "progress_callback": progress_callback,
+            "language": language,
         }
         if emotion_config:
             runtime_kwargs.update(emotion_config)

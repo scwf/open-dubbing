@@ -35,7 +35,7 @@ DEFAULT_PROMPT_TEXT = (
     project_root / "resources" / "reference_voices" / "mcs.txt"
 ).read_text(encoding="utf-8").strip()
 DEFAULT_LANGUAGE = "zh"
-DEFAULT_TTS_ENGINE = "index_tts2"
+DEFAULT_TTS_ENGINE = "index_tts25"
 DEFAULT_TTS_MAX_RETRIES = 2
 DEFAULT_EMOTION_TEXT = "平静"
 DEFAULT_EMOTION_ALPHA = 0.5
@@ -100,13 +100,18 @@ def parse_args():
     parser.add_argument(
         "--emotion-text",
         default=DEFAULT_EMOTION_TEXT,
-        help="IndexTTS2 文本情感描述",
+        help="IndexTTS-2 / 2.5 文本情感描述",
     )
     parser.add_argument(
         "--emotion-alpha",
         type=float,
         default=DEFAULT_EMOTION_ALPHA,
         help="情感强度，范围 0.0-1.0",
+    )
+    parser.add_argument(
+        "--language",
+        default=DEFAULT_LANGUAGE,
+        help="合成语言。IndexTTS-2.5 支持 zh/en/ja/es/ar",
     )
 
     args = parser.parse_args()
@@ -145,7 +150,7 @@ def main():
     output_file = args.output_file
     tts_engine_name = args.tts_engine
     strategy_name = determine_strategy(input_file, args.strategy)
-    lang = DEFAULT_LANGUAGE
+    lang = args.language or DEFAULT_LANGUAGE
     tts_max_retries = DEFAULT_TTS_MAX_RETRIES
     voice_files = args.voice_files
     prompt_texts = args.prompt_texts
@@ -159,7 +164,7 @@ def main():
     
     # 获取情感控制配置（仅当使用IndexTTS2时）
     emotion_config = {}
-    if tts_engine_name == 'index_tts2':
+    if tts_engine_name in ('index_tts2', 'index_tts25'):
         emotion_config = get_emotion_config(args)
         if emotion_config:
             logger.info(f"IndexTTS2情感控制配置: {emotion_config}")
@@ -240,7 +245,7 @@ def main():
             "voice_files": voice_files,        # 所有参考音频文件
             "prompt_texts": prompt_texts,      # 所有参考文本
             "max_retries": tts_max_retries,
-            # IndexTTS2情感控制参数
+            "language": lang,
             **emotion_config
         }
         
