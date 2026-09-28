@@ -77,11 +77,12 @@ wsl.exe -e bash -lc 'cd "<REPO_ROOT>" && conda activate index-tts25 && python ai
 | --- | --- | --- |
 | 1 | mcs | 默认男声，科技讲解风格 |
 | 2 | wm1 | 短句示例 |
-| 3 | qjc | 日常口语 |
-| 4 | tyzr | 太乙真人 |
-| 5 | zxx | 周星驰风格 |
-| 6 | karpathy | 英文科技讲解 |
-| 7 | **自定义** | 用户提供 `--voice-files` 与 `--prompt-texts`（可多对） |
+| 3 | qjc | 齐静春 |
+| 4 | qjc1 | 齐静春1 |
+| 5 | tyzr | 太乙真人 |
+| 6 | zxx | 周星驰风格 |
+| 7 | karpathy | 英文科技讲解 |
+| 8 | **自定义** | 用户提供 `--voice-files` 与 `--prompt-texts`（可多对） |
 
 用户选中内置项后：Agent 读取对应 `{name}.ext` 与 `{name}.txt`（或 `dubbing.conf.example` 中 `[内置音频:{name}]` 的 `text`），作为 `--voice-files` / `--prompt-texts`。
 

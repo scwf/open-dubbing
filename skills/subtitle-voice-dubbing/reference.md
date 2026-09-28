@@ -35,7 +35,9 @@
 | 名称 | 音频 | 用途 |
 | --- | --- | --- |
 | mcs | mcs.mp3 | CLI 默认 |
-| wm1, qjc, tyzr, zxx, karpathy | .wav | 内置示例 |
+| wm1, tyzr, zxx, karpathy | .wav | 内置示例 |
+| qjc | qjc.wav | 齐静春 |
+| qjc1 | qjc1.wav | 齐静春1 |
 | wf1–wf7 | .mp3/.wav | 扩展内置示例（见目录） |
 
 ## 附属脚本

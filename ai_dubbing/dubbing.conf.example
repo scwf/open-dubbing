@@ -111,6 +111,10 @@ text = "希望你以后做得比我还好哟"
 path = resources/reference_voices/qjc.wav
 text = "对我来说呢，这道菜最好吃，因为放了很多醋，比较符合我的胃口，而且经济实惠"
 
+[内置音频:qjc1]
+path = resources/reference_voices/qjc1.wav
+text = "你说遇事不决，可问春风，春风不语，即随本心"
+
 [内置音频:tyzr]
 path = resources/reference_voices/tyzr.wav
 text = "对，这就是我，万人敬仰的太乙真人"
