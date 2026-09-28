@@ -77,7 +77,7 @@ wsl.exe -e bash -lc 'cd "<REPO_ROOT>" && conda activate index-tts25 && python ai
 | --- | --- | --- |
 | 1 | mcs | 默认男声，科技讲解风格 |
 | 2 | wm1 | 短句示例 |
-| 3 | qjc | 古风 |
+| 3 | qjc | 日常口语 |
 | 4 | tyzr | 太乙真人 |
 | 5 | zxx | 周星驰风格 |
 | 6 | karpathy | 英文科技讲解 |
