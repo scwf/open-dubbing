@@ -126,3 +126,11 @@ text = "好啊，江湖规矩，单挑啊，拿葱那个大婶，出来！表情
 [内置音频:karpathy]
 path = resources/reference_voices/karpathy.wav
 text = "大家好，其实我一直想做这样一个视频，这是一个面向大众的，全面但通俗的关于大型语言模型比如ChatGPT的介绍。我希望通过这个视频，能够为大家提供一些思维模型，帮助你们理解这个工具到底是什么"
+
+[内置音频:王林]
+path = resources/reference_voices/王林.wav
+text = "你话也不要说太满。若是又被人撵着打，就来天运星找我。有我在，谁也不敢动你。"
+
+[内置音频:杨过]
+path = resources/reference_voices/杨过.wav
+text = "山色远，水波长，暮云春月照潇湘。醉魂应逐凌波梦，分付东风暖黄花。"

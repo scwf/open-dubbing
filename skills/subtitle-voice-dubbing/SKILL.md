@@ -82,7 +82,9 @@ wsl.exe -e bash -lc 'cd "<REPO_ROOT>" && conda activate index-tts25 && python ai
 | 5 | tyzr | 太乙真人 |
 | 6 | zxx | 周星驰风格 |
 | 7 | karpathy | 英文科技讲解 |
-| 8 | **自定义** | 用户提供 `--voice-files` 与 `--prompt-texts`（可多对） |
+| 8 | 王林 | 王林 |
+| 9 | 杨过 | 杨过 |
+| 10 | **自定义** | 用户提供 `--voice-files` 与 `--prompt-texts`（可多对） |
 
 用户选中内置项后：Agent 读取对应 `{name}.ext` 与 `{name}.txt`（或 `dubbing.conf.example` 中 `[内置音频:{name}]` 的 `text`），作为 `--voice-files` / `--prompt-texts`。
 

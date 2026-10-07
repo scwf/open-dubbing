@@ -38,6 +38,8 @@
 | wm1, tyzr, zxx, karpathy | .wav | 内置示例 |
 | qjc | qjc.wav | 齐静春 |
 | qjc1 | qjc1.wav | 齐静春1 |
+| 王林 | 王林.wav | 王林 |
+| 杨过 | 杨过.wav | 杨过 |
 | wf1–wf7 | .mp3/.wav | 扩展内置示例（见目录） |
 
 ## 附属脚本
